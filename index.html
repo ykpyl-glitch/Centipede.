@@ -43,7 +43,7 @@
   .document-grid { flex: 1; padding: 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 24px; overflow-y: auto; align-content: start; }
   .doc-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 12px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; position: relative; transition: transform 0.15s, box-shadow 0.15s; }
   .doc-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.5); }
-  .doc-preview { width: 100%; height: 200px; background: #2a2a2a; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  .doc-preview { width: 100%; height: 160px; background: #2a2a2a; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
   .doc-name { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .doc-meta { font-size: 12px; color: var(--text-secondary); }
   .doc-delete { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #fff; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -51,7 +51,7 @@
   /* Editor View */
   .editor-header { height: var(--header-height); background: var(--header-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 10; }
   .editor-header-left { display: flex; align-items: center; gap: 12px; }
-  .btn-icon { background: transparent; border: none; width: 36px; height: 36px; border-radius: 8px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-primary); }
+  .btn-icon { background: transparent; border: none; padding: 6px 12px; border-radius: 8px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-primary); }
   .btn-icon:hover { background: #2a2a2a; }
   .doc-title-input { font-size: 16px; font-weight: 600; border: none; outline: none; width: 200px; background: transparent; color: var(--text-primary); }
 
@@ -145,12 +145,17 @@ function openDB() {
   });
 }
 
-async function saveDocToDB(docRecord) {
-  const tx = db.transaction('documents', 'readwrite');
-  await tx.objectStore('documents').put(docRecord);
+function saveDocToDB(docRecord) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('documents', 'readwrite');
+    const store = tx.objectStore('documents');
+    const req = store.put(docRecord);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
 }
 
-async function getAllDocsFromDB() {
+function getAllDocsFromDB() {
   return new Promise((resolve) => {
     const tx = db.transaction('documents', 'readonly');
     const req = tx.objectStore('documents').getAll();
@@ -158,9 +163,12 @@ async function getAllDocsFromDB() {
   });
 }
 
-async function deleteDocFromDB(id) {
-  const tx = db.transaction('documents', 'readwrite');
-  await tx.objectStore('documents').delete(id);
+function deleteDocFromDB(id) {
+  return new Promise((resolve) => {
+    const tx = db.transaction('documents', 'readwrite');
+    const req = tx.objectStore('documents').delete(id);
+    req.onsuccess = () => resolve();
+  });
 }
 
 let currentDoc = null, pdfDoc = null, pageNum = 1, tool = 'pen', strokes = {};
@@ -176,7 +184,7 @@ const colors = { pen: '#111111', high: '#f4d03f' };
 
 window.addEventListener('DOMContentLoaded', async () => {
   await openDB();
-  loadLibrary();
+  await loadLibrary();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
 });
 
@@ -188,7 +196,7 @@ function showView(viewId) {
 async function loadLibrary() {
   const docs = await getAllDocsFromDB();
   const grid = document.getElementById('documentGrid');
-  if (docs.length === 0) {
+  if (!docs || docs.length === 0) {
     grid.innerHTML = `<div class="empty-state"><div style="font-size:48px; margin-bottom:12px;">📂</div><p style="font-weight:600;">No Documents Yet</p><p style="font-size:13px;">Import a PDF file to start taking notes and drawing offline.</p></div>`;
     return;
   }
@@ -235,7 +243,7 @@ async function openDocument(docRecord) {
   strokes = currentDoc.strokes || {};
   pageNum = 1;
   document.getElementById('activeDocTitle').value = currentDoc.title;
-  pdfDoc = await pdfjsLib.getDocument({ data: currentDoc.bytes }).promise;
+  pdfDoc = await pdfjsLib.getDocument({ data: currentDoc.bytes.slice(0) }).promise;
   showView('editorView');
   await renderPage();
 }
@@ -243,12 +251,12 @@ async function openDocument(docRecord) {
 document.getElementById('backBtn').onclick = async () => {
   if (currentDoc) {
     currentDoc.title = document.getElementById('activeDocTitle').value;
-    currentDoc.strokes = strokes;
+    currentDoc.strokes = JSON.parse(JSON.stringify(strokes));
     currentDoc.updatedAt = Date.now();
     await saveDocToDB(currentDoc);
   }
   showView('dashboardView');
-  loadLibrary();
+  await loadLibrary();
 };
 
 document.getElementById('activeDocTitle').onchange = async (e) => {
@@ -355,7 +363,7 @@ const handlePointerEnd = async e => {
     activeStylusId = null;
     try { ink.releasePointerCapture(e.pointerId); } catch (_) {}
     if (currentDoc) {
-      currentDoc.strokes = strokes;
+      currentDoc.strokes = JSON.parse(JSON.stringify(strokes));
       currentDoc.updatedAt = Date.now();
       await saveDocToDB(currentDoc);
     }
@@ -380,28 +388,77 @@ document.getElementById('eraseTool').onclick = () => setTool('erase');
 document.getElementById('prevPage').onclick = async () => { if (pdfDoc && pageNum > 1) { pageNum--; await renderPage(); } };
 document.getElementById('nextPage').onclick = async () => { if (pdfDoc && pageNum < pdfDoc.numPages) { pageNum++; await renderPage(); } };
 
+// Direct base64 DataURL converter for robust PDF export
+function dataURLToUint8Array(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
 document.getElementById('saveBtn').onclick = async () => {
   if (!pdfDoc || !currentDoc) return;
-  const doc = await PDFLib.PDFDocument.load(currentDoc.bytes);
-  for (let i = 1; i <= pdfDoc.numPages; i++) {
-    const arr = strokes[i]; if (!arr || !arr.length) continue;
-    const page = doc.getPages()[i - 1]; const s = page.getSize();
-    const c = document.createElement('canvas'); c.width = 1000; c.height = 1000 * s.height / s.width;
-    const x = c.getContext('2d'); x.scale(c.width / pdf.width, c.height / pdf.height);
-    for (const st of arr) {
-      x.save(); x.lineCap = 'round'; x.lineJoin = 'round';
-      if (st.tool === 'erase') { x.globalCompositeOperation = 'destination-out'; x.strokeStyle = '#000'; }
-      else if (st.tool === 'highlighter') { x.globalAlpha = .35; x.strokeStyle = colors.high; x.globalCompositeOperation = 'multiply'; }
-      else { x.strokeStyle = colors.pen; }
-      x.lineWidth = st.w; x.beginPath(); x.moveTo(st.p[0].x, st.p[0].y); for (const pt of st.p) x.lineTo(pt.x, pt.y); x.stroke(); x.restore();
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = '⏳ Exporting...';
+  try {
+    const doc = await PDFLib.PDFDocument.load(currentDoc.bytes.slice(0));
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const arr = strokes[i];
+      if (!arr || !arr.length) continue;
+
+      const page = doc.getPages()[i - 1];
+      const s = page.getSize();
+      
+      const c = document.createElement('canvas');
+      c.width = 1000;
+      c.height = 1000 * (s.height / s.width);
+      const x = c.getContext('2d');
+      x.scale(c.width / pdf.width, c.height / pdf.height);
+
+      for (const st of arr) {
+        x.save();
+        x.lineCap = 'round';
+        x.lineJoin = 'round';
+        if (st.tool === 'erase') {
+          x.globalCompositeOperation = 'destination-out';
+          x.strokeStyle = '#000';
+        } else if (st.tool === 'highlighter') {
+          x.globalAlpha = .35;
+          x.strokeStyle = colors.high;
+          x.globalCompositeOperation = 'multiply';
+        } else {
+          x.strokeStyle = colors.pen;
+        }
+        x.lineWidth = st.w;
+        x.beginPath();
+        x.moveTo(st.p[0].x, st.p[0].y);
+        for (const pt of st.p) x.lineTo(pt.x, pt.y);
+        x.stroke();
+        x.restore();
+      }
+
+      const pngBytes = dataURLToUint8Array(c.toDataURL('image/png'));
+      const img = await doc.embedPng(pngBytes);
+      page.drawImage(img, { x: 0, y: 0, width: s.width, height: s.height });
     }
-    const img = await doc.embedPng(await fetch(c.toDataURL()).then(r => r.arrayBuffer()));
-    page.drawImage(img, { x: 0, y: 0, width: s.width, height: s.width * (s.height / s.width) });
+
+    const out = await doc.save();
+    const blob = new Blob([out], { type: 'application/pdf' });
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = u;
+    a.download = `${currentDoc.title || 'Annotated'}-Annotated.pdf`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(u), 2000);
+  } catch (err) {
+    alert('Export failed: ' + err.message);
+  } finally {
+    btn.textContent = '💾 Export PDF';
   }
-  const out = await doc.save(); const blob = new Blob([out], { type: 'application/pdf' });
-  const u = URL.createObjectURL(blob); const a = document.createElement('a');
-  a.href = u; a.download = `${currentDoc.title}-Annotated.pdf`; a.click();
-  setTimeout(() => URL.revokeObjectURL(u), 2000);
 };
 </script>
 </body>
