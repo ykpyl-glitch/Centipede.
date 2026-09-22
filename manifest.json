@@ -1,6 +1,6 @@
 {
-  "name": "Centipede",
-  "short_name": "Centipede",
+  "name": "Centipede.",
+  "short_name": "Centipede.",
   "display": "standalone",
   "start_url": "./",
   "scope": "./",
