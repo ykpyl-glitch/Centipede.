@@ -642,16 +642,24 @@ exportBtn.addEventListener('click', async () => {
     }
 
     const outBytes = await outDoc.save();
-    const blob = new Blob([outBytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = originalFilename + '-annotated.pdf';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    showToast('Saved — check your Downloads');
+    const blob = new Blob([outBytes], { type: "application/pdf" });
+
+const file = new File(
+  [blob],
+  originalFilename + "-annotated.pdf",
+  { type: "application/pdf" }
+);
+
+if (navigator.canShare && navigator.canShare({ files: [file] })) {
+  await navigator.share({
+    files: [file],
+    title: file.name
+  });
+  showToast("Saved to Files");
+} else {
+  showToast("Sharing isn't supported");
+}
+
   } catch (err) {
     console.error(err);
     showToast('Export failed — try again');
