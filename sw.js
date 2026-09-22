@@ -1,4 +1,4 @@
-const CACHE_NAME = "goodnotes-v2";
+const CACHE_NAME = "centipede-v1";
 const ASSETS = [
   "./",
   "./index.html",
