@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Centipede - PDF Annotator</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#121212">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>
+  :root {
+    --bg-main: #121212;
+    --card-bg: #1e1e1e;
+    --sidebar-bg: #1e1e1e;
+    --header-bg: #1e1e1e;
+    --accent: #bb86fc;
+    --accent-hover: #9965da;
+    --border: #2c2c2c;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --header-height: 56px;
+    --dropdown-bg: #282828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg-main); color: var(--text-primary); height: 100vh; overflow: hidden; display: flex; color-scheme: dark; }
+
+  #app { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
+  .view { display: none; width: 100%; height: 100%; flex-direction: column; }
+  .view.active { display: flex; }
+
+  /* Dashboard View */
+  #dashboardView { background: var(--bg-main); }
+  .dash-header { height: var(--header-height); background: var(--header-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
+  .dash-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary); }
+  .dash-title span { color: var(--accent); }
+
+  .btn-primary { background: var(--accent); color: #000000; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: background 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  .document-grid { flex: 1; padding: 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 24px; overflow-y: auto; align-content: start; }
+  .doc-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 12px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; position: relative; transition: transform 0.15s, box-shadow 0.15s; }
+  .doc-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.5); }
+  .doc-preview { width: 100%; height: 160px; background: #2a2a2a; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  .doc-name { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc-meta { font-size: 12px; color: var(--text-secondary); }
+  .doc-delete { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #fff; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+  .doc-delete:hover { background: #ff4d4d; }
+
+  /* Editor View */
+  .editor-header { height: var(--header-height); background: var(--header-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 100; position: relative; }
+  .editor-header-left { display: flex; align-items: center; gap: 8px; }
+  .btn-icon { background: transparent; border: none; padding: 6px 12px; border-radius: 8px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-primary); transition: background 0.15s; }
+  .btn-icon:hover { background: #2a2a2a; }
+  .doc-title-input { font-size: 15px; font-weight: 600; border: 1px solid transparent; border-radius: 6px; outline: none; width: 180px; background: transparent; color: var(--text-primary); padding: 4px 8px; transition: border-color 0.2s; }
+  .doc-title-input:focus { border-color: var(--accent); background: #121212; }
+
+  /* File Dropdown Menu */
+  .menu-container { position: relative; }
+  .menu-dropdown { position: absolute; top: calc(100% + 6px); left: 0; background: var(--dropdown-bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); display: none; flex-direction: column; min-width: 210px; z-index: 1000; overflow: hidden; padding: 6px 0; }
+  .menu-dropdown.show { display: flex; }
+  .menu-item { background: transparent; border: none; padding: 10px 16px; color: var(--text-primary); font-size: 14px; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.15s; }
+  .menu-item:hover { background: #3a3a3a; color: #fff; }
+  .menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .menu-item.danger { color: #ff6b6b; }
+  .menu-item.danger:hover { background: rgba(255,107,107,0.15); }
+
+  /* Toolbar */
+  .toolbar-container { height: 50px; background: #1a1a1a; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; overflow-x: auto; }
+  .toolbar-section { display: flex; align-items: center; gap: 10px; }
+  .tool-group { display: flex; background: #2a2a2a; padding: 3px; border-radius: 10px; gap: 2px; }
+  .tool-btn { background: transparent; border: none; padding: 6px 12px; border-radius: 8px; font-size: 15px; cursor: pointer; color: var(--text-primary); transition: all 0.15s; }
+  .tool-btn:hover { background: #353535; }
+  .tool-btn.active { background: #404040; color: var(--accent); box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+  
+  .size-picker { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; }
+  .size-picker input { accent-color: var(--accent); width: 80px; }
+
+  .color-picker-group { display: flex; align-items: center; gap: 6px; }
+  .color-swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform 0.15s; }
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.active { border-color: #ffffff; transform: scale(1.15); }
+
+  #stage { flex: 1; overflow: auto; background: #181818; display: flex; justify-content: center; padding: 20px; position: relative; }
+  #wrap { position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.6); background: #ffffff; }
+  
+  canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #pdf { position: relative; }
+  #ink { touch-action: none; z-index: 5; }
+
+  .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+
+  /* Toast Notification */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: #333; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); opacity: 0; transition: all 0.3s ease; z-index: 2000; pointer-events: none; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* Modal Info */
+  .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1500; }
+  .modal-overlay.show { display: flex; }
+  .modal-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 90%; max-width: 420px; color: var(--text-primary); }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--accent); }
+  .modal-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; color: var(--text-secondary); }
+  .modal-row span:last-child { color: var(--text-primary); font-weight: 500; }
+  .modal-close { margin-top: 18px; width: 100%; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- DASHBOARD VIEW -->
+  <div id="dashboardView" class="view active">
+    <div class="dash-header">
+      <div class="dash-title"><span>Centipede.</span></div>
+      <div>
+        <button class="btn-primary" id="importBtn">➕ Import PDF</button>
+        <input id="fileInput" type="file" accept="application/pdf" hidden>
+      </div>
+    </div>
+    <div class="document-grid" id="documentGrid">
+      <div class="empty-state">
+        <div style="font-size:48px; margin-bottom:12px;">📂</div>
+        <p style="font-weight:600;">No Documents Yet</p>
+        <p style="font-size:13px;">Import a PDF file to start taking notes and drawing offline.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDITOR VIEW -->
+  <div id="editorView" class="view">
+    <div class="editor-header">
+      <div class="editor-header-left">
+        <!-- FILE MENU DROPDOWN -->
+        <div class="menu-container">
+          <button class="btn-icon" id="fileMenuBtn" style="font-weight:600;">📁 File ▾</button>
+          <div class="menu-dropdown" id="fileMenuDropdown">
+            <button class="menu-item" id="menuImportBtn">➕ Import New PDF</button>
+            <div class="menu-divider"></div>
+            <button class="menu-item" id="menuSavePdfBtn">💾 Export PDF</button>
+            <button class="menu-item" id="menuExportPngBtn">🖼️ Export Page as PNG</button>
+            <div class="menu-divider"></div>
+            <button class="menu-item" id="menuDocInfoBtn">ℹ️ Document Info</button>
+            <button class="menu-item" id="menuClearPageBtn">🧹 Clear Page Annotations</button>
+            <div class="menu-divider"></div>
+            <button class="menu-item danger" id="menuDeleteBtn">🗑️ Delete Document</button>
+            <div class="menu-divider"></div>
+            <button class="menu-item" id="menuBackBtn">◀ Exit to Library</button>
+          </div>
+        </div>
+
+        <input type="text" class="doc-title-input" id="activeDocTitle" value="Untitled Document" title="Click to rename">
+      </div>
+
+      <div style="display:flex; gap:8px; align-items:center;">
+        <span id="pageInfo" style="font-size:13px; color:var(--text-secondary);">1/1</span>
+        <button class="btn-icon" id="prevPage" title="Previous Page">◀</button>
+        <button class="btn-icon" id="nextPage" title="Next Page">▶</button>
+        <button class="btn-primary" id="saveBtn">💾 Export PDF</button>
+      </div>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="toolbar-container">
+      <div class="toolbar-section">
+        <div class="tool-group">
+          <button class="tool-btn active" id="penTool" title="Pen">✏️</button>
+          <button class="tool-btn" id="highTool" title="Highlighter">🖍️</button>
+          <button class="tool-btn" id="eraseTool" title="Stroke Eraser">🩹</button>
+          <button class="tool-btn" id="whiteoutTool" title="Whiteout Cover">⬜</button>
+        </div>
+
+        <div class="color-picker-group" id="colorPickerGroup">
+          <div class="color-swatch active" data-color="#111111" style="background:#111111;" title="Black"></div>
+          <div class="color-swatch" data-color="#e74c3c" style="background:#e74c3c;" title="Red"></div>
+          <div class="color-swatch" data-color="#2ecc71" style="background:#2ecc71;" title="Green"></div>
+          <div class="color-swatch" data-color="#3498db" style="background:#3498db;" title="Blue"></div>
+          <div class="color-swatch" data-color="#bb86fc" style="background:#bb86fc;" title="Purple"></div>
+        </div>
+
+        <div class="size-picker">
+          <span>Size:</span>
+          <input id="strokeSize" type="range" min="1" max="30" value="3">
+        </div>
+      </div>
+
+      <div class="toolbar-section">
+        <button class="btn-icon" id="undoBtn" title="Undo (Ctrl+Z)">↩️</button>
+        <button class="btn-icon" id="redoBtn" title="Redo (Ctrl+Y)">↪️</button>
+      </div>
+    </div>
+
+    <div id="stage">
+      <div id="wrap">
+        <canvas id="pdf"></canvas>
+        <canvas id="ink"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST & MODALS -->
+<div id="toast" class="toast">Action completed</div>
+
+<div id="infoModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">Document Details</div>
+    <div class="modal-row"><span>Filename</span><span id="infoDocName">-</span></div>
+    <div class="modal-row"><span>Total Pages</span><span id="infoPageCount">-</span></div>
+    <div class="modal-row"><span>Total Annotations</span><span id="infoStrokeCount">-</span></div>
+    <div class="modal-row"><span>Last Modified</span><span id="infoLastUpdated">-</span></div>
+    <button class="btn-primary modal-close" id="closeInfoModalBtn">Close</button>
+  </div>
+</div>
+
+<script>
+const DB_NAME = 'CentipedeDB', DB_VERSION = 1;
+let db;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('documents')) d.createObjectStore('documents', { keyPath: 'id' });
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+function saveDocToDB(docRecord) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('documents', 'readwrite');
+    const store = tx.objectStore('documents');
+    const req = store.put(docRecord);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function getAllDocsFromDB() {
+  return new Promise((resolve) => {
+    const tx = db.transaction('documents', 'readonly');
+    const req = tx.objectStore('documents').getAll();
+    req.onsuccess = () => resolve(req.result || []);
+  });
+}
+
+function deleteDocFromDB(id) {
+  return new Promise((resolve) => {
+    const tx = db.transaction('documents', 'readwrite');
+    const req = tx.objectStore('documents').delete(id);
+    req.onsuccess = () => resolve();
+  });
+}
+
+// Global State
+let currentDoc = null, pdfDoc = null, pageNum = 1, tool = 'pen', strokes = {};
+let undoStack = {}, redoStack = {};
+let selectedPenColor = '#111111', highlighterColor = '#f4d03f';
+let drawing = false, currentStroke = null, activeStylusId = null;
+let lastTouchY = 0, lastTouchX = 0, isFingerScrolling = false;
+
+const pdf = document.getElementById('pdf'), ink = document.getElementById('ink');
+const stage = document.getElementById('stage'), wrap = document.getElementById('wrap');
+const pctx = pdf.getContext('2d'), ictx = ink.getContext('2d');
+const pageInfo = document.getElementById('pageInfo');
+const sizeInput = document.getElementById('strokeSize');
+
+// Toast Notification
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  await openDB();
+  await loadLibrary();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration error:', err));
+  }
+});
+
+function showView(viewId) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(viewId).classList.add('active');
+}
+
+async function loadLibrary() {
+  const docs = await getAllDocsFromDB();
+  const grid = document.getElementById('documentGrid');
+  if (!docs || docs.length === 0) {
+    grid.innerHTML = `<div class="empty-state"><div style="font-size:48px; margin-bottom:12px;">📂</div><p style="font-weight:600;">No Documents Yet</p><p style="font-size:13px;">Import a PDF file to start taking notes and drawing offline.</p></div>`;
+    return;
+  }
+  grid.innerHTML = '';
+  docs.forEach(doc => {
+    const card = document.createElement('div');
+    card.className = 'doc-card';
+    card.innerHTML = `
+      <div class="doc-preview"><span style="font-size:32px;">📄</span></div>
+      <div class="doc-info">
+        <div class="doc-name">${escapeHtml(doc.title)}</div>
+        <div class="doc-meta">Updated ${new Date(doc.updatedAt).toLocaleDateString()}</div>
+      </div>
+      <button class="doc-delete" title="Delete">✕</button>
+    `;
+    card.querySelector('.doc-delete').onclick = (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete "${doc.title}"?`)) deleteDocFromDB(doc.id).then(() => {
+        showToast('Document deleted');
+        loadLibrary();
+      });
+    };
+    card.onclick = () => openDocument(doc);
+    grid.appendChild(card);
+  });
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+document.getElementById('importBtn').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('menuImportBtn').onclick = () => {
+  closeMenu();
+  document.getElementById('fileInput').click();
+};
+
+document.getElementById('fileInput').onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const bytes = await file.arrayBuffer();
+  const newDoc = {
+    id: 'doc_' + Date.now(),
+    title: file.name.replace(/\.[^/.]+$/, ""),
+    bytes: bytes,
+    strokes: {},
+    updatedAt: Date.now()
+  };
+  await saveDocToDB(newDoc);
+  await loadLibrary();
+  openDocument(newDoc);
+  showToast('PDF imported successfully');
+};
+
+async function openDocument(docRecord) {
+  currentDoc = docRecord;
+  strokes = currentDoc.strokes || {};
+  undoStack = {};
+  redoStack = {};
+  pageNum = 1;
+  document.getElementById('activeDocTitle').value = currentDoc.title;
+  pdfDoc = await pdfjsLib.getDocument({ data: currentDoc.bytes.slice(0) }).promise;
+  showView('editorView');
+  await renderPage();
+}
+
+// File Menu Logic
+const fileMenuBtn = document.getElementById('fileMenuBtn');
+const fileMenuDropdown = document.getElementById('fileMenuDropdown');
+
+function closeMenu() { fileMenuDropdown.classList.remove('show'); }
+
+fileMenuBtn.onclick = (e) => {
+  e.stopPropagation();
+  fileMenuDropdown.classList.toggle('show');
+};
+
+document.addEventListener('click', (e) => {
+  if (!fileMenuDropdown.contains(e.target) && e.target !== fileMenuBtn) {
+    closeMenu();
+  }
+});
+
+document.getElementById('menuBackBtn').onclick = async () => {
+  closeMenu();
+  await saveCurrentDocState();
+  showView('dashboardView');
+  await loadLibrary();
+};
+
+document.getElementById('menuDocInfoBtn').onclick = () => {
+  closeMenu();
+  if (!currentDoc) return;
+  let totalStrokes = 0;
+  Object.values(strokes).forEach(arr => totalStrokes += (arr ? arr.length : 0));
+  document.getElementById('infoDocName').textContent = currentDoc.title;
+  document.getElementById('infoPageCount').textContent = pdfDoc ? pdfDoc.numPages : '-';
+  document.getElementById('infoStrokeCount').textContent = totalStrokes;
+  document.getElementById('infoLastUpdated').textContent = new Date(currentDoc.updatedAt).toLocaleString();
+  document.getElementById('infoModal').classList.add('show');
+};
+
+document.getElementById('closeInfoModalBtn').onclick = () => {
+  document.getElementById('infoModal').classList.remove('show');
+};
+
+document.getElementById('menuClearPageBtn').onclick = async () => {
+  closeMenu();
+  if (confirm(`Clear all annotations on Page ${pageNum}?`)) {
+    saveUndoState();
+    strokes[pageNum] = [];
+    redrawStrokes();
+    await saveCurrentDocState();
+    showToast(`Page ${pageNum} annotations cleared`);
+  }
+};
+
+document.getElementById('menuDeleteBtn').onclick = async () => {
+  closeMenu();
+  if (currentDoc && confirm(`Are you sure you want to delete "${currentDoc.title}"?`)) {
+    await deleteDocFromDB(currentDoc.id);
+    currentDoc = null;
+    showToast('Document deleted');
+    showView('dashboardView');
+    await loadLibrary();
+  }
+};
+
+async function saveCurrentDocState() {
+  if (currentDoc) {
+    currentDoc.title = document.getElementById('activeDocTitle').value;
+    currentDoc.strokes = JSON.parse(JSON.stringify(strokes));
+    currentDoc.updatedAt = Date.now();
+    await saveDocToDB(currentDoc);
+  }
+}
+
+document.getElementById('activeDocTitle').onchange = async (e) => {
+  if (currentDoc) {
+    currentDoc.title = e.target.value;
+    await saveDocToDB(currentDoc);
+  }
+};
+
+// Canvas & Page Rendering
+async function renderPage() {
+  const page = await pdfDoc.getPage(pageNum);
+  const dpr = window.devicePixelRatio || 1;
+  const vp = page.getViewport({ scale: 1.5 });
+  
+  pdf.width = ink.width = Math.floor(vp.width * dpr);
+  pdf.height = ink.height = Math.floor(vp.height * dpr);
+  
+  pdf.style.width = ink.style.width = vp.width + 'px';
+  pdf.style.height = ink.style.height = vp.height + 'px';
+  wrap.style.width = vp.width + 'px';
+  wrap.style.height = vp.height + 'px';
+
+  pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ictx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  await page.render({ canvasContext: pctx, viewport: vp }).promise;
+  redrawStrokes();
+  pageInfo.textContent = pageNum + '/' + pdfDoc.numPages;
+}
+
+function getStrokes() { return strokes[pageNum] || (strokes[pageNum] = []); }
+
+function redrawStrokes() {
+  const dpr = window.devicePixelRatio || 1;
+  ictx.clearRect(0, 0, ink.width / dpr, ink.height / dpr);
+  
+  for (const s of getStrokes()) {
+    ictx.save();
+    ictx.lineCap = 'round';
+    ictx.lineJoin = 'round';
+
+    if (s.tool === 'erase') {
+      ictx.globalCompositeOperation = 'destination-out';
+      ictx.strokeStyle = '#000000';
+    } else if (s.tool === 'whiteout') {
+      ictx.globalCompositeOperation = 'source-over';
+      ictx.strokeStyle = '#ffffff';
+    } else if (s.tool === 'highlighter') {
+      ictx.globalAlpha = 0.35;
+      ictx.strokeStyle = s.color || highlighterColor;
+      ictx.globalCompositeOperation = 'multiply';
+    } else {
+      ictx.globalCompositeOperation = 'source-over';
+      ictx.strokeStyle = s.color || selectedPenColor;
+    }
+
+    ictx.lineWidth = s.w;
+    ictx.beginPath();
+    ictx.moveTo(s.p[0].x, s.p[0].y);
+    for (const pt of s.p) ictx.lineTo(pt.x, pt.y);
+    ictx.stroke();
+    ictx.restore();
+  }
+}
+
+// Pointer Handling with Robust Safety Checks
+function safeCapturePointer(el, pointerId) {
+  try { el.setPointerCapture(pointerId); } catch (_) {}
+}
+
+function safeReleasePointer(el, pointerId) {
+  try {
+    if (el.hasPointerCapture && el.hasPointerCapture(pointerId)) {
+      el.releasePointerCapture(pointerId);
+    }
+  } catch (_) {}
+}
+
+ink.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'pen' || e.pointerType === 'mouse') {
+    e.preventDefault();
+    e.stopPropagation();
+    activeStylusId = e.pointerId;
+    drawing = true;
+    safeCapturePointer(ink, e.pointerId);
+    
+    const rect = ink.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    saveUndoState();
+
+    let strokeColor = selectedPenColor;
+    if (tool === 'highlighter') strokeColor = highlighterColor;
+    else if (tool === 'whiteout') strokeColor = '#ffffff';
+
+    currentStroke = {
+      tool: tool,
+      color: strokeColor,
+      w: tool === 'highlighter' ? sizeInput.value * 3 : (tool === 'whiteout' ? sizeInput.value * 2.5 : +sizeInput.value),
+      p: [{ x: x, y: y }]
+    };
+    getStrokes().push(currentStroke);
+    redrawStrokes();
+  } else if (e.pointerType === 'touch') {
+    isFingerScrolling = true;
+    lastTouchX = e.clientX;
+    lastTouchY = e.clientY;
+  }
+}, { passive: false });
+
+ink.addEventListener('pointermove', e => {
+  if (drawing && e.pointerId === activeStylusId) {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = ink.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    currentStroke.p.push({ x: x, y: y });
+    redrawStrokes();
+  } else if (isFingerScrolling && e.pointerType === 'touch') {
+    const deltaX = lastTouchX - e.clientX;
+    const deltaY = lastTouchY - e.clientY;
+    stage.scrollLeft += deltaX;
+    stage.scrollTop += deltaY;
+    lastTouchX = e.clientX;
+    lastTouchY = e.clientY;
+  }
+}, { passive: false });
+
+const handlePointerEnd = async e => {
+  if (e.pointerId === activeStylusId) {
+    if (e.type === 'pointercancel' && currentStroke) {
+      const list = getStrokes();
+      const idx = list.indexOf(currentStroke);
+      if (idx !== -1) list.splice(idx, 1);
+      redrawStrokes();
+    }
+    drawing = false;
+    activeStylusId = null;
+    safeReleasePointer(ink, e.pointerId);
+    await saveCurrentDocState();
+  }
+  if (e.pointerType === 'touch') {
+    isFingerScrolling = false;
+  }
+};
+
+ink.addEventListener('pointerup', handlePointerEnd);
+ink.addEventListener('pointercancel', handlePointerEnd);
+
+// Tool Switcher & Color Picker
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  let activeId = 'penTool';
+  if (t === 'highlighter') activeId = 'highTool';
+  else if (t === 'erase') activeId = 'eraseTool';
+  else if (t === 'whiteout') activeId = 'whiteoutTool';
+  document.getElementById(activeId).classList.add('active');
+  document.getElementById('colorPickerGroup').style.display = (t === 'erase' || t === 'whiteout') ? 'none' : 'flex';
+}
+
+document.getElementById('penTool').onclick = () => setTool('pen');
+document.getElementById('highTool').onclick = () => setTool('highlighter');
+document.getElementById('eraseTool').onclick = () => setTool('erase');
+document.getElementById('whiteoutTool').onclick = () => setTool('whiteout');
+
+document.querySelectorAll('.color-swatch').forEach(sw => {
+  sw.onclick = (e) => {
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+    selectedPenColor = sw.getAttribute('data-color');
+    if (tool === 'highlighter') highlighterColor = selectedPenColor;
+  };
+});
+
+// Pagination
+document.getElementById('prevPage').onclick = async () => { if (pdfDoc && pageNum > 1) { pageNum--; await renderPage(); } };
+document.getElementById('nextPage').onclick = async () => { if (pdfDoc && pageNum < pdfDoc.numPages) { pageNum++; await renderPage(); } };
+
+// Undo / Redo Logic
+function saveUndoState() {
+  if (!undoStack[pageNum]) undoStack[pageNum] = [];
+  undoStack[pageNum].push(JSON.parse(JSON.stringify(getStrokes())));
+  redoStack[pageNum] = []; // Clear redo on new action
+}
+
+document.getElementById('undoBtn').onclick = () => {
+  if (undoStack[pageNum] && undoStack[pageNum].length > 0) {
+    if (!redoStack[pageNum]) redoStack[pageNum] = [];
+    redoStack[pageNum].push(JSON.parse(JSON.stringify(getStrokes())));
+    strokes[pageNum] = undoStack[pageNum].pop();
+    redrawStrokes();
+    saveCurrentDocState();
+  }
+};
+
+document.getElementById('redoBtn').onclick = () => {
+  if (redoStack[pageNum] && redoStack[pageNum].length > 0) {
+    if (!undoStack[pageNum]) undoStack[pageNum] = [];
+    undoStack[pageNum].push(JSON.parse(JSON.stringify(getStrokes())));
+    strokes[pageNum] = redoStack[pageNum].pop();
+    redrawStrokes();
+    saveCurrentDocState();
+  }
+};
+
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    e.preventDefault();
+    if (e.shiftKey) document.getElementById('redoBtn').click();
+    else document.getElementById('undoBtn').click();
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+    e.preventDefault();
+    document.getElementById('redoBtn').click();
+  }
+});
+
+// PNG Export
+document.getElementById('menuExportPngBtn').onclick = () => {
+  closeMenu();
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = pdf.width;
+  exportCanvas.height = pdf.height;
+  const ctx = exportCanvas.getContext('2d');
+  ctx.drawImage(pdf, 0, 0);
+  ctx.drawImage(ink, 0, 0);
+  
+  const link = document.createElement('a');
+  link.download = `${currentDoc.title || 'Page'}-Page-${pageNum}.png`;
+  link.href = exportCanvas.toDataURL('image/png');
+  link.click();
+  showToast(`Page ${pageNum} exported as PNG`);
+};
+
+// PDF Export Helper
+function dataURLToUint8Array(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function exportAnnotatedPdf() {
+  if (!pdfDoc || !currentDoc) return;
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = '⏳ Exporting...';
+  try {
+    const doc = await PDFLib.PDFDocument.load(currentDoc.bytes.slice(0));
+    
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const arr = strokes[i];
+      if (!arr || !arr.length) continue;
+
+      const page = doc.getPages()[i - 1];
+      const s = page.getSize();
+      
+      const c = document.createElement('canvas');
+      c.width = 1200;
+      c.height = 1200 * (s.height / s.width);
+      const x = c.getContext('2d');
+      
+      // Calculate display CSS width/height from DOM pdf canvas
+      const cssW = parseFloat(pdf.style.width) || (c.width / 1.5);
+      const cssH = parseFloat(pdf.style.height) || (c.height / 1.5);
+
+      x.scale(c.width / cssW, c.height / cssH);
+
+      for (const st of arr) {
+        x.save();
+        x.lineCap = 'round';
+        x.lineJoin = 'round';
+
+        if (st.tool === 'erase') {
+          x.globalCompositeOperation = 'destination-out';
+          x.strokeStyle = '#000000';
+        } else if (st.tool === 'whiteout') {
+          x.globalCompositeOperation = 'source-over';
+          x.strokeStyle = '#ffffff';
+        } else if (st.tool === 'highlighter') {
+          x.globalAlpha = 0.35;
+          x.strokeStyle = st.color || highlighterColor;
+          x.globalCompositeOperation = 'multiply';
+        } else {
+          x.globalCompositeOperation = 'source-over';
+          x.strokeStyle = st.color || selectedPenColor;
+        }
+
+        x.lineWidth = st.w;
+        x.beginPath();
+        x.moveTo(st.p[0].x, st.p[0].y);
+        for (const pt of st.p) x.lineTo(pt.x, pt.y);
+        x.stroke();
+        x.restore();
+      }
+
+      const pngBytes = dataURLToUint8Array(c.toDataURL('image/png'));
+      const img = await doc.embedPng(pngBytes);
+      page.drawImage(img, { x: 0, y: 0, width: s.width, height: s.height });
+    }
+
+    const out = await doc.save();
+    const blob = new Blob([out], { type: 'application/pdf' });
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = u;
+    a.download = `${currentDoc.title || 'Annotated'}-Annotated.pdf`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(u), 2000);
+    showToast('Export completed!');
+  } catch (err) {
+    alert('Export failed: ' + err.message);
+  } finally {
+    btn.textContent = '💾 Export PDF';
+  }
+}
+
+document.getElementById('saveBtn').onclick = exportAnnotatedPdf;
+document.getElementById('menuSavePdfBtn').onclick = () => {
+  closeMenu();
+  exportAnnotatedPdf();
+};
+</script>
+</body>
+</html>
