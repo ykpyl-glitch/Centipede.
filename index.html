@@ -304,6 +304,19 @@
     let isDrawing = false;
     let lastPoint = null;
     let activePointerId = null;
+    let allowFingerDrawing = false; 
+
+    function toggleFingerDrawing() {
+      allowFingerDrawing = !allowFingerDrawing;
+      const btn = document.getElementById('btn-touch-toggle');
+      if (allowFingerDrawing) {
+        btn.innerText = 'FINGER: ON';
+        btn.classList.add('active');
+      } else {
+        btn.innerText = 'FINGER: OFF';
+        btn.classList.remove('active');
+      }
+    }
 
     let folders = []; 
     let currentFolderId = null;
