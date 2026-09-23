@@ -418,6 +418,7 @@
       document.getElementById('view-menu').classList.add('active');
       renderFolders();
     }
+    
     function showViewer() {
       document.getElementById('view-menu').classList.remove('active');
       document.getElementById('view-viewer').classList.add('active');
@@ -428,7 +429,7 @@
       document.getElementById('pen-size-val').innerText = val + 'px';
     }
 
-    // UPDATED: HiDPI / Retina canvas setup
+    // High DPI / Retina setup
     function initCanvasSize(w, h) {
       const container = document.getElementById('canvas-container');
       const dpr = window.devicePixelRatio || 1;
@@ -459,6 +460,7 @@
     }
 
     function shouldAcceptPointer(e) {
+      // Rejects secondary multi-touch fingers (allows primary touch or pen/mouse)
       if (e.pointerType === 'touch' && !e.isPrimary) return false;
       return true;
     }
@@ -480,13 +482,12 @@
       drawCtx.fill();
     }
 
-    // UPDATED: Pointer Capture applied
+    // Pointer Capture applied to prevent drawing clipping at edges
     function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
       if (activePointerId !== null && activePointerId !== e.pointerId) return;
       e.preventDefault();
       
-      // Capture the pointer to prevent stroke clipping
       drawCanvas.setPointerCapture(e.pointerId);
       
       activePointerId = e.pointerId;
@@ -510,7 +511,6 @@
       lastPoint = currentPoint;
     }
 
-    // UPDATED: Pointer Capture released
     function stopDrawing(e) {
       if (e && e.pointerId !== undefined && e.pointerId !== activePointerId) return;
       
@@ -522,6 +522,8 @@
       isDrawing = false;
       lastPoint = null;
       activePointerId = null;
+      
+      // Save triggers in background without freezing
       if (wasDrawing) saveCurrentPageAnnotation();
     }
 
@@ -533,7 +535,6 @@
 
     function clearCanvas() {
       const dpr = window.devicePixelRatio || 1;
-      // Because context is scaled, clear bounds use unscaled width/height
       drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
       saveCurrentPageAnnotation();
     }
@@ -646,9 +647,33 @@
       });
     }
 
-    // UPDATED: High DPI transform applied to PDF rendering and saved layer loading
+    // Asynchronous Blob saving to prevent UI lag on Retina screens
+    function saveCurrentPageAnnotation() {
+      if (!pdfDoc || !currentPdfId) return Promise.resolve();
+      
+      const pageToSave = currentPageNum;
+      
+      return new Promise(resolve => {
+        drawCanvas.toBlob(async (blob) => {
+          if (!blob) {
+            resolve();
+            return;
+          }
+          pageAnnotations[pageToSave] = blob;
+          await idbPut('annotations', { 
+            key: currentPdfId + '_' + pageToSave, 
+            data: blob 
+          });
+          resolve();
+        }, 'image/png');
+      });
+    }
+
+    // Updated loading logic to handle Blob storage natively
     async function renderPage(num) {
       if (!pdfDoc || num < 1 || num > totalPages) return;
+      
+      // Await saving so canvas isn't cleared mid-blob generation
       await saveCurrentPageAnnotation();
 
       const page = await pdfDoc.getPage(num);
@@ -657,7 +682,6 @@
       
       initCanvasSize(viewport.width, viewport.height);
 
-      // Inject scaling directly into PDF.js rendering pipeline
       const renderContext = {
         canvasContext: pdfCtx,
         viewport: viewport,
@@ -672,27 +696,32 @@
       let saved = pageAnnotations[num];
       if (saved === undefined) {
         const rec = await idbGet('annotations', currentPdfId + '_' + num);
-        saved = rec ? rec.dataUrl : null;
+        
+        // Handle newer Blob saves or legacy Base64 saves
+        if (rec && rec.data) {
+          saved = rec.data; 
+        } else if (rec && rec.dataUrl) {
+          saved = rec.dataUrl;
+        } else {
+          saved = null;
+        }
         pageAnnotations[num] = saved;
       }
       
       if (saved) {
         const img = new Image();
+        const isBlob = saved instanceof Blob;
+        const objectUrl = isBlob ? URL.createObjectURL(saved) : saved;
+        
         img.onload = () => {
-           // drawCtx scales naturally to CSS coordinates
            drawCtx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+           if (isBlob) URL.revokeObjectURL(objectUrl); 
         };
-        img.src = saved;
+        img.src = objectUrl;
       }
+      
       updatePageControls();
       document.getElementById('status-text').innerText = "READY // " + currentPdfName;
-    }
-
-    async function saveCurrentPageAnnotation() {
-      if (!pdfDoc || !currentPdfId) return;
-      const dataUrl = drawCanvas.toDataURL();
-      pageAnnotations[currentPageNum] = dataUrl;
-      await idbPut('annotations', { key: currentPdfId + '_' + currentPageNum, dataUrl });
     }
 
     function nextPage() { if (pdfDoc && currentPageNum < totalPages) renderPage(currentPageNum + 1); }
