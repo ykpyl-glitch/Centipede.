@@ -7,6 +7,10 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
+  
+  <!-- PDF.js standard styles required for the Text Layer -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
+  
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
 
@@ -132,7 +136,6 @@
       touch-action: manipulation;
     }
 
-
     .btn:hover { background: var(--accent-dim); }
     .btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
     .btn:disabled { background: var(--panel); border-color: var(--disabled-grey); color: var(--disabled-grey); cursor: not-allowed; opacity: 0.6; }
@@ -183,10 +186,20 @@
       transform-origin: top left;
     }
 
-    canvas { position: absolute; top: 0; left: 0; touch-action: none; }
-    #pdf-canvas { z-index: 1; }
-    #draw-canvas { z-index: 2; cursor: crosshair; }
+    /* Z-INDEX STACKING */
+    canvas, .textLayer { position: absolute; top: 0; left: 0; }
+    #pdf-canvas { z-index: 1; touch-action: none; }
+    .textLayer { z-index: 2; opacity: 0.5; /* Opacity only affects selection highlight color, text is transparent */ } 
+    #draw-canvas { z-index: 3; touch-action: none; cursor: crosshair; }
 
+    /* MODE TOGGLES */
+    #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
+    #canvas-container.mode-draw .textLayer { pointer-events: none; user-select: none; -webkit-user-select: none; }
+    
+    #canvas-container.mode-select #draw-canvas { pointer-events: none; }
+    #canvas-container.mode-select .textLayer { pointer-events: auto; user-select: text; -webkit-user-select: text; cursor: text; }
+
+    /* Page Navigation */
     .page-arrow {
       position: absolute;
       top: 50%;
@@ -264,6 +277,9 @@
 
     <section id="view-viewer" class="view">
       <div class="viewer-toolbar">
+        <!-- New Mode Toggle on the far left -->
+        <button id="btn-mode-toggle" class="btn active" onclick="toggleInteractionMode()">MODE: DRAW</button>
+        
         <button class="btn" onclick="showMenu()">☰ MENU</button>
         <button id="btn-pen" class="btn active">PEN</button>
         <button id="btn-touch-toggle" class="btn" onclick="toggleFingerDrawing()">FINGER: OFF</button>
@@ -272,18 +288,21 @@
           <input type="range" id="pen-size" min="1" max="50" value="3" oninput="updatePenSize(this.value)">
           <span id="pen-size-val">3px</span>
         </div>
-        <button id="btn-highlighter" class="btn" disabled>HIGHLIGHT</button>
-        <button id="btn-eraser" class="btn" disabled>ERASER</button>
         <button class="btn" onclick="clearCanvas()">CLEAR</button>
         <button class="btn" onclick="downloadPage()">EXPORT</button>
       </div>
 
       <div class="workspace">
         <button class="page-arrow left" id="btn-prev-page" onclick="prevPage()">◀</button>
-        <div id="canvas-container">
+        
+        <!-- Added mode-draw class by default -->
+        <div id="canvas-container" class="mode-draw">
           <canvas id="pdf-canvas"></canvas>
+          <!-- New Text Layer -->
+          <div id="text-layer" class="textLayer"></div>
           <canvas id="draw-canvas"></canvas>
         </div>
+        
         <button class="page-arrow right" id="btn-next-page" onclick="nextPage()">▶</button>
         <div class="page-pill" id="page-info">PAGE: 0 / 0</div>
       </div>
@@ -293,7 +312,6 @@
   <div class="status-bar"><span id="status-text">SYSTEM READY // NO PDF LOADED</span></div>
 
   <script>
-    // PWA Service Worker Registration
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(console.error);
@@ -302,28 +320,17 @@
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+    // State
     const currentTool = 'pen';
     let penSize = 3;
     let isDrawing = false;
     let lastPoint = null;
     let activePointerId = null;
     let allowFingerDrawing = false; 
-
-    function toggleFingerDrawing() {
-      allowFingerDrawing = !allowFingerDrawing;
-      const btn = document.getElementById('btn-touch-toggle');
-      if (allowFingerDrawing) {
-        btn.innerText = 'FINGER: ON';
-        btn.classList.add('active');
-      } else {
-        btn.innerText = 'FINGER: OFF';
-        btn.classList.remove('active');
-      }
-    }
+    let interactionMode = 'draw'; // 'draw' or 'select'
 
     let folders = []; 
     let currentFolderId = null;
-
     let pdfDoc = null;
     let currentPageNum = 1;
     let totalPages = 0;
@@ -335,6 +342,7 @@
     const pdfCtx = pdfCanvas.getContext('2d', { alpha: false });
     const drawCanvas = document.getElementById('draw-canvas');
     const drawCtx = drawCanvas.getContext('2d');
+    const textLayerDiv = document.getElementById('text-layer');
 
     const DB_NAME = 'centipede-db';
     const DB_VERSION = 1;
@@ -441,19 +449,55 @@
       document.getElementById('view-viewer').classList.add('active');
     }
 
+    // --- NEW MODE TOGGLE ---
+    function toggleInteractionMode() {
+      const container = document.getElementById('canvas-container');
+      const btn = document.getElementById('btn-mode-toggle');
+      
+      if (interactionMode === 'draw') {
+        interactionMode = 'select';
+        btn.innerText = 'MODE: SELECT';
+        btn.classList.remove('active');
+        container.classList.remove('mode-draw');
+        container.classList.add('mode-select');
+      } else {
+        interactionMode = 'draw';
+        btn.innerText = 'MODE: DRAW';
+        btn.classList.add('active');
+        container.classList.remove('mode-select');
+        container.classList.add('mode-draw');
+      }
+    }
+
+    function toggleFingerDrawing() {
+      allowFingerDrawing = !allowFingerDrawing;
+      const btn = document.getElementById('btn-touch-toggle');
+      if (allowFingerDrawing) {
+        btn.innerText = 'FINGER: ON';
+        btn.classList.add('active');
+      } else {
+        btn.innerText = 'FINGER: OFF';
+        btn.classList.remove('active');
+      }
+    }
+
     function updatePenSize(val) {
       penSize = parseInt(val, 10);
       document.getElementById('pen-size-val').innerText = val + 'px';
     }
 
-    // High DPI / Retina setup
-    function initCanvasSize(w, h) {
+    function initCanvasSize(w, h, scale) {
       const container = document.getElementById('canvas-container');
       const dpr = window.devicePixelRatio || 1;
 
       // Container uses CSS dimensions
       container.style.width = w + 'px';
       container.style.height = h + 'px';
+
+      // Visual Text Layer uses CSS dimensions
+      textLayerDiv.style.width = w + 'px';
+      textLayerDiv.style.height = h + 'px';
+      textLayerDiv.style.setProperty('--scale-factor', scale);
 
       // Canvas internal resolution scales by DPR
       pdfCanvas.width = w * dpr;
@@ -475,21 +519,16 @@
       const rect = drawCanvas.getBoundingClientRect();
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
-        function shouldAcceptPointer(e) {
-      // 1. The Apple Pencil is ALWAYS allowed
+
+    function shouldAcceptPointer(e) {
+      if (interactionMode !== 'draw') return false; 
       if (e.pointerType === 'pen') return true;
-      
-      // 2. If the finger fallback is turned on, allow touch (and mouse)
       if (allowFingerDrawing) {
-        // Still reject secondary multi-touch fingers to prevent accidental palm marks
         if (e.pointerType === 'touch' && !e.isPrimary) return false;
         return true;
       }
-      
-      // 3. Otherwise, block it (strict palm rejection)
       return false;
     }
-
 
     function applyStrokeStyle() {
       drawCtx.globalAlpha = 1;
@@ -508,7 +547,6 @@
       drawCtx.fill();
     }
 
-    // Pointer Capture applied to prevent drawing clipping at edges
     function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
       if (activePointerId !== null && activePointerId !== e.pointerId) return;
@@ -549,7 +587,6 @@
       lastPoint = null;
       activePointerId = null;
       
-      // Save triggers in background without freezing
       if (wasDrawing) saveCurrentPageAnnotation();
     }
 
@@ -673,7 +710,6 @@
       });
     }
 
-    // Asynchronous Blob saving to prevent UI lag on Retina screens
     function saveCurrentPageAnnotation() {
       if (!pdfDoc || !currentPdfId) return Promise.resolve();
       
@@ -695,18 +731,16 @@
       });
     }
 
-    // Updated loading logic to handle Blob storage natively
     async function renderPage(num) {
       if (!pdfDoc || num < 1 || num > totalPages) return;
       
-      // Await saving so canvas isn't cleared mid-blob generation
       await saveCurrentPageAnnotation();
 
       const page = await pdfDoc.getPage(num);
       const viewport = page.getViewport({ scale: 1.5 });
       const dpr = window.devicePixelRatio || 1;
       
-      initCanvasSize(viewport.width, viewport.height);
+      initCanvasSize(viewport.width, viewport.height, viewport.scale);
 
       const renderContext = {
         canvasContext: pdfCtx,
@@ -714,16 +748,27 @@
         transform: [dpr, 0, 0, dpr, 0, 0]
       };
       
+      // 1. Render the visual PDF content
       await page.render(renderContext).promise;
+
+      // 2. Render the invisible Text Layer
+      textLayerDiv.innerHTML = '';
+      const textContent = await page.getTextContent();
+      await pdfjsLib.renderTextLayer({
+        textContentSource: textContent,
+        container: textLayerDiv,
+        viewport: viewport,
+        textDivs: []
+      }).promise;
 
       currentPageNum = num;
       drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
 
+      // 3. Load your saved drawings
       let saved = pageAnnotations[num];
       if (saved === undefined) {
         const rec = await idbGet('annotations', currentPdfId + '_' + num);
         
-        // Handle newer Blob saves or legacy Base64 saves
         if (rec && rec.data) {
           saved = rec.data; 
         } else if (rec && rec.dataUrl) {
