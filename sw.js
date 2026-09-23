@@ -1,4 +1,4 @@
-const CACHE_NAME = "centipede-v4";
+const CACHE_NAME = "centipede-v5";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -6,8 +6,10 @@ const STATIC_ASSETS = [
   "./apple-touch-icon.png",
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css",
   "https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap"
 ];
+
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
