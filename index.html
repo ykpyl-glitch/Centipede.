@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>CENTIPEDE. // PDF & CANVAS SYSTEM</title>
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" href="apple-touch-icon.png">
@@ -11,247 +11,193 @@
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
 
     :root {
-      --bg-dark: #000000;
-      --bg-panel: #0a0002;
-      --bg-hover: #1f0206;
-      --border-red: #ff0033;
-      --border-dark-red: #88001b;
-      --text-red: #ff2a55;
+      --logo-red: #ff0033;
+      --accent: #e8e8ec;
+      --accent-dim: #3a3a42;
+      --border: #2c2c33;
+      --panel: #141417;
+      --panel-alt: #1c1c21;
       --text-bright: #ffffff;
-      --highlight-yellow: #fff200;
+      --text-dim: #9a9aa2;
+      --disabled-grey: #444449;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
 
-    body {
+    html, body {
       background-color: #050505;
       color: var(--text-bright);
       font-family: 'Share Tech Mono', monospace;
-      height: 100vh;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
       display: flex;
       flex-direction: column;
-      overflow: hidden;
     }
 
     header {
       background: #000;
-      border-bottom: 4px solid var(--border-red);
+      border-bottom: 1px solid var(--border);
       padding: 10px 16px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      z-index: 30;
-      gap: 12px;
-    }
-
-    .menu-toggle {
-      background: #110004;
-      border: 2px solid var(--border-red);
-      color: var(--text-bright);
-      width: 40px;
-      height: 40px;
-      flex-shrink: 0;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
       justify-content: center;
-      box-shadow: 2px 2px 0px #88001b;
+      flex-shrink: 0;
     }
-    .menu-toggle:hover { background: var(--border-red); color: #000; }
-    .menu-toggle .bar { width: 20px; height: 2px; background: currentColor; position: relative; }
-    .menu-toggle .bar::before, .menu-toggle .bar::after {
-      content: ''; position: absolute; left: 0; width: 20px; height: 2px; background: currentColor;
-    }
-    .menu-toggle .bar::before { top: -6px; }
-    .menu-toggle .bar::after { top: 6px; }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       font-family: 'Press Start 2P', monospace;
       font-size: 13px;
-      color: var(--text-red);
-      text-shadow: 2px 2px #550011;
-      white-space: nowrap;
+      color: var(--logo-red);
     }
 
     .brand svg {
-      width: 32px;
-      height: 32px;
-      flex-shrink: 0;
-      filter: drop-shadow(0 0 4px var(--border-red));
+      width: 26px;
+      height: 26px;
     }
 
-    .toolbar {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      flex-wrap: wrap;
-      overflow-x: auto;
-    }
-
-    .btn {
-      background: #110004;
-      border: 2px solid var(--border-red);
-      color: var(--text-bright);
-      padding: 8px 12px;
-      font-family: 'Press Start 2P', monospace;
-      font-size: 10px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      box-shadow: 2px 2px 0px #88001b;
-      white-space: nowrap;
-    }
-
-    .btn:hover {
-      background: var(--border-red);
-      color: #000;
-      box-shadow: 2px 2px 0px #ffffff;
-    }
-
-    .btn.active {
-      background: var(--border-red);
-      color: #000;
-      border-color: #ffffff;
-      box-shadow: inset 2px 2px 0px #000;
-    }
-
-    .btn.highlighter-btn.active {
-      background: var(--highlight-yellow);
-      border-color: var(--highlight-yellow);
-      color: #000;
-    }
-
-    .size-control {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #110004;
-      border: 2px solid var(--border-dark-red);
-      padding: 4px 8px;
-      font-size: 12px;
-      flex-shrink: 0;
-    }
-
-    .size-control input[type="range"] {
-      accent-color: var(--border-red);
-      cursor: pointer;
-      width: 80px;
-    }
-
-    .app-container {
-      display: flex;
+    main {
       flex: 1;
       overflow: hidden;
       position: relative;
     }
 
-    /* Slide-out main menu */
-    .sidebar-overlay {
-      position: fixed;
+    .view {
+      display: none;
+      position: absolute;
       inset: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 19;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-    }
-    .sidebar-overlay.open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .sidebar {
-      width: 280px;
-      background: #030001;
-      border-right: 4px solid var(--border-red);
-      display: flex;
       flex-direction: column;
-      padding: 12px;
-      gap: 12px;
-      overflow-y: auto;
-      position: fixed;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      z-index: 20;
-      transform: translateX(-100%);
-      transition: transform 0.25s ease;
-      box-shadow: 4px 0 20px rgba(255,0,51,0.4);
+      overflow: hidden;
     }
 
-    .sidebar.open {
-      transform: translateX(0);
-    }
+    .view.active { display: flex; }
 
-    .sidebar-close {
-      align-self: flex-end;
-      background: none;
-      border: 2px solid var(--border-dark-red);
+    /* ---------- MAIN MENU VIEW ---------- */
+    #view-menu { padding: 20px; overflow-y: auto; }
+
+    .menu-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 13px;
       color: var(--text-bright);
-      padding: 4px 10px;
-      cursor: pointer;
-      font-family: 'Press Start 2P', monospace;
-      font-size: 10px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
     }
 
-    .section-title {
-      font-family: 'Press Start 2P', monospace;
-      font-size: 10px;
-      color: var(--text-red);
-      border-bottom: 2px dashed var(--border-dark-red);
-      padding-bottom: 6px;
-      margin-top: 8px;
+    .menu-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
     }
+
+    .folder-tree { display: flex; flex-direction: column; gap: 10px; max-width: 700px; }
 
     .folder-item {
-      background: #0e0004;
-      border: 2px solid var(--border-dark-red);
-      padding: 8px;
-      margin-top: 6px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 10px;
       cursor: pointer;
     }
 
-    .folder-item.active {
-      border-color: var(--border-red);
-      background: #1a0008;
-    }
+    .folder-item.active { border-color: var(--accent); background: var(--panel-alt); }
 
     .folder-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       font-weight: bold;
-      color: #ff99aa;
+      color: var(--text-bright);
+      font-size: 13px;
     }
 
     .pdf-list {
-      margin-top: 6px;
-      padding-left: 8px;
+      margin-top: 8px;
+      padding-left: 6px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
 
     .pdf-item {
-      padding: 6px;
-      background: #050001;
-      border: 1px solid var(--border-dark-red);
-      font-size: 11px;
+      padding: 12px 10px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      font-size: 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       cursor: pointer;
       word-break: break-all;
+      color: var(--text-dim);
     }
 
-    .pdf-item:hover, .pdf-item.active {
-      background: var(--border-red);
-      color: #000;
+    .pdf-item:active, .pdf-item:hover { background: var(--accent); color: #000; }
+
+    .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; }
+
+    /* ---------- BUTTONS ---------- */
+    .btn {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      padding: 6px 10px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      border-radius: 3px;
     }
+
+    .btn:hover { background: var(--accent-dim); }
+    .btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    .btn:disabled {
+      background: var(--panel);
+      border-color: var(--disabled-grey);
+      color: var(--disabled-grey);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    /* ---------- VIEWER ---------- */
+    #view-viewer { flex-direction: column; }
+
+    .viewer-toolbar {
+      background: #000;
+      border-bottom: 1px solid var(--border);
+      padding: 8px 10px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .size-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      font-size: 10px;
+      flex-shrink: 0;
+      border-radius: 3px;
+      color: var(--text-dim);
+    }
+
+    .size-control input[type="range"] { accent-color: var(--accent); cursor: pointer; width: 70px; }
+    .size-control:has(input:disabled) { opacity: 0.5; }
 
     .workspace {
       flex: 1;
@@ -266,66 +212,67 @@
     #canvas-container {
       position: relative;
       background: #ffffff;
-      box-shadow: 0 0 20px rgba(255, 0, 51, 0.3);
+      box-shadow: 0 0 16px rgba(0, 0, 0, 0.5);
       margin: auto;
     }
 
-    canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      touch-action: none;
-    }
-
+    canvas { position: absolute; top: 0; left: 0; touch-action: none; }
     #pdf-canvas { z-index: 1; }
     #draw-canvas { z-index: 2; cursor: crosshair; }
 
+    /* Page-skip arrows: floating on the canvas itself, not buried in a status bar */
+    .page-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(20, 20, 23, 0.85);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 10;
+      backdrop-filter: blur(2px);
+    }
+    .page-arrow:active { background: var(--accent); color: #000; }
+    .page-arrow.left { left: 12px; }
+    .page-arrow.right { right: 12px; }
+    .page-arrow:disabled { opacity: 0.25; cursor: default; }
+
+    .page-pill {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 3px;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
     .status-bar {
       background: #000;
-      border-top: 2px solid var(--border-dark-red);
-      padding: 4px 12px;
-      font-size: 11px;
-      color: var(--text-red);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .page-nav {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .page-nav-btn {
-      background: #110004;
-      border: 1px solid var(--border-red);
-      color: var(--text-bright);
-      padding: 3px 8px;
+      border-top: 1px solid var(--border);
+      padding: 5px 12px;
       font-size: 10px;
-      cursor: pointer;
-      font-family: 'Share Tech Mono', monospace;
+      color: var(--text-dim);
+      flex-shrink: 0;
     }
-
-    .page-nav-btn:hover:not(:disabled) {
-      background: var(--border-red);
-      color: #000;
-    }
-
-    .page-nav-btn:disabled {
-      opacity: 0.35;
-      cursor: default;
-    }
-
-    #pdf-input { display: none; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
   <header>
-    <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Main menu"><span class="bar"></span></button>
-
     <div class="brand">
       <svg viewBox="0 0 100 100">
         <path d="M5,50 Q50,10 95,50 Q50,90 5,50 Z" fill="#ffffff" stroke="#000" stroke-width="4"/>
@@ -335,70 +282,60 @@
       </svg>
       CENTIPEDE.
     </div>
-
-    <div class="toolbar">
-      <button class="btn" onclick="document.getElementById('pdf-input').click()">+ LOAD PDF</button>
-      <input type="file" id="pdf-input" accept="application/pdf">
-
-      <button id="btn-pen" class="btn active" onclick="setTool('pen')">PEN</button>
-      <div class="size-control">
-        <span>P-SIZE:</span>
-        <input type="range" id="pen-size" min="1" max="50" value="3" oninput="updatePenSize(this.value)">
-        <span id="pen-size-val">3px</span>
-      </div>
-
-      <button id="btn-highlighter" class="btn highlighter-btn" onclick="setTool('highlighter')">HIGHLIGHT</button>
-      <div class="size-control">
-        <span>H-SIZE:</span>
-        <input type="range" id="highlighter-size" min="8" max="60" value="20" oninput="updateHighlighterSize(this.value)">
-        <span id="highlighter-size-val">20px</span>
-      </div>
-
-      <button id="btn-eraser" class="btn" onclick="setTool('eraser')">ERASER</button>
-      <div class="size-control">
-        <span>E-SIZE:</span>
-        <input type="range" id="eraser-size" min="5" max="100" value="20" oninput="updateEraserSize(this.value)">
-        <span id="eraser-size-val">20px</span>
-      </div>
-
-      <button class="btn" onclick="clearCanvas()">CLEAR</button>
-      <button class="btn" onclick="downloadPage()">EXPORT</button>
-    </div>
   </header>
 
-  <div class="app-container">
-    <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
-    <div class="sidebar" id="sidebar">
-      <button class="sidebar-close" onclick="closeSidebar()">CLOSE ✕</button>
-      <button class="btn" style="width: 100%;" onclick="createNewFolder()">+ NEW FOLDER</button>
-      <div class="section-title">// ORGANIZER</div>
-      <div id="folder-tree"></div>
-    </div>
-
-    <div class="workspace">
-      <div id="canvas-container">
-        <canvas id="pdf-canvas"></canvas>
-        <canvas id="draw-canvas"></canvas>
+  <main>
+    <!-- MAIN MENU -->
+    <section id="view-menu" class="view active">
+      <div class="menu-title">// MAIN MENU</div>
+      <div class="menu-actions">
+        <button class="btn" onclick="document.getElementById('pdf-input').click()">+ LOAD PDF</button>
+        <button class="btn" onclick="createNewFolder()">+ NEW FOLDER</button>
       </div>
-    </div>
-  </div>
+      <input type="file" id="pdf-input" accept="application/pdf" hidden>
+      <div id="folder-tree" class="folder-tree"></div>
+    </section>
 
-  <div class="status-bar">
-    <span id="status-text">SYSTEM READY // NO PDF LOADED</span>
-    <div class="page-nav">
-      <button id="btn-prev-page" class="page-nav-btn" onclick="prevPage()">◀ PREV</button>
-      <span id="page-info">PAGE: 0 / 0</span>
-      <button id="btn-next-page" class="page-nav-btn" onclick="nextPage()">NEXT ▶</button>
-    </div>
-  </div>
+    <!-- VIEWER -->
+    <section id="view-viewer" class="view">
+      <div class="viewer-toolbar">
+        <button class="btn" onclick="showMenu()">☰ MENU</button>
+
+        <button id="btn-pen" class="btn active">PEN</button>
+        <div class="size-control">
+          <span>SIZE:</span>
+          <input type="range" id="pen-size" min="1" max="50" value="3" oninput="updatePenSize(this.value)">
+          <span id="pen-size-val">3px</span>
+        </div>
+
+        <button id="btn-highlighter" class="btn" disabled title="Disabled — pen only">HIGHLIGHT</button>
+        <button id="btn-eraser" class="btn" disabled title="Disabled — pen only">ERASER</button>
+
+        <button class="btn" onclick="clearCanvas()">CLEAR</button>
+        <button class="btn" onclick="downloadPage()">EXPORT</button>
+      </div>
+
+      <div class="workspace">
+        <button class="page-arrow left" id="btn-prev-page" onclick="prevPage()">◀</button>
+        <div id="canvas-container">
+          <canvas id="pdf-canvas"></canvas>
+          <canvas id="draw-canvas"></canvas>
+        </div>
+        <button class="page-arrow right" id="btn-next-page" onclick="nextPage()">▶</button>
+        <div class="page-pill" id="page-info">PAGE: 0 / 0</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="status-bar"><span id="status-text">SYSTEM READY // NO PDF LOADED</span></div>
 
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    let currentTool = 'pen';
+    // Only the pen writes. Highlighter/eraser are disabled per request; the
+    // tool is hard-locked to 'pen' so no other drawing mode can be reached.
+    const currentTool = 'pen';
     let penSize = 3;
-    let eraserSize = 20;
-    let highlighterSize = 20;
     let isDrawing = false;
     let lastPoint = null;
     let activePointerId = null; // only this pointer is allowed to draw
@@ -406,52 +343,31 @@
     let folders = [{ id: 'default', name: 'ROOT_DOCS', pdfs: [] }];
     let currentFolderId = 'default';
 
-    // ---- Multi-page PDF state ----
-    let pdfDoc = null;        // current pdf.js document
+    let pdfDoc = null;
     let currentPageNum = 1;
     let totalPages = 0;
     let currentPdfName = '';
-    let pageAnnotations = {}; // { [pageNum]: dataURL } — cleared whenever a new PDF loads
+    let pageAnnotations = {};
 
     const pdfCanvas = document.getElementById('pdf-canvas');
     const pdfCtx = pdfCanvas.getContext('2d');
     const drawCanvas = document.getElementById('draw-canvas');
     const drawCtx = drawCanvas.getContext('2d');
 
-    // ---- Main menu (sidebar) ----
-    function toggleSidebar() {
-      const sb = document.getElementById('sidebar');
-      const ov = document.getElementById('sidebar-overlay');
-      const opening = !sb.classList.contains('open');
-      sb.classList.toggle('open', opening);
-      ov.classList.toggle('open', opening);
+    // ---- View switching ----
+    function showMenu() {
+      document.getElementById('view-viewer').classList.remove('active');
+      document.getElementById('view-menu').classList.add('active');
+      renderFolders();
     }
-    function closeSidebar() {
-      document.getElementById('sidebar').classList.remove('open');
-      document.getElementById('sidebar-overlay').classList.remove('open');
-    }
-
-    // ---- Tools ----
-    function setTool(tool) {
-      currentTool = tool;
-      document.getElementById('btn-pen').classList.toggle('active', tool === 'pen');
-      document.getElementById('btn-highlighter').classList.toggle('active', tool === 'highlighter');
-      document.getElementById('btn-eraser').classList.toggle('active', tool === 'eraser');
+    function showViewer() {
+      document.getElementById('view-menu').classList.remove('active');
+      document.getElementById('view-viewer').classList.add('active');
     }
 
     function updatePenSize(val) {
       penSize = parseInt(val, 10);
       document.getElementById('pen-size-val').innerText = val + 'px';
-    }
-
-    function updateHighlighterSize(val) {
-      highlighterSize = parseInt(val, 10);
-      document.getElementById('highlighter-size-val').innerText = val + 'px';
-    }
-
-    function updateEraserSize(val) {
-      eraserSize = parseInt(val, 10);
-      document.getElementById('eraser-size-val').innerText = val + 'px';
     }
 
     function initCanvasSize(w, h) {
@@ -466,18 +382,17 @@
 
     initCanvasSize(800, 1000);
     drawCtx.fillStyle = '#ffffff';
-    drawCtx.fillRect(0,0,800,1000);
+    drawCtx.fillRect(0, 0, 800, 1000);
 
     function getPos(e) {
       const rect = drawCanvas.getBoundingClientRect();
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
 
-    // Palm/multi-touch rejection: with pointer events, the browser marks exactly
-    // one active touch point as "primary" (normally the first finger down).
-    // We only ever draw with that primary pointer, and lock to its pointerId
-    // until it's lifted, so a second finger (palm or otherwise) can't jump in
-    // and get connected to the first finger's stroke.
+    // Palm/multi-touch rejection: only the browser's "primary" touch point
+    // (normally the first finger down) is ever allowed to draw, and we lock
+    // to its pointerId until it lifts, so a second finger can't get
+    // connected into the same stroke.
     function shouldAcceptPointer(e) {
       if (e.pointerType === 'touch' && !e.isPrimary) return false;
       return true;
@@ -485,35 +400,19 @@
 
     function applyStrokeStyle() {
       drawCtx.globalAlpha = 1;
-      if (currentTool === 'pen') {
-        drawCtx.globalCompositeOperation = 'source-over';
-        drawCtx.strokeStyle = '#000000';
-        drawCtx.fillStyle = '#000000';
-        drawCtx.lineWidth = penSize;
-      } else if (currentTool === 'highlighter') {
-        drawCtx.globalCompositeOperation = 'source-over';
-        drawCtx.globalAlpha = 0.35;
-        drawCtx.strokeStyle = '#fff200';
-        drawCtx.fillStyle = '#fff200';
-        drawCtx.lineWidth = highlighterSize;
-      } else {
-        drawCtx.globalCompositeOperation = 'destination-out';
-        drawCtx.strokeStyle = 'rgba(0,0,0,1)';
-        drawCtx.lineWidth = eraserSize;
-      }
+      drawCtx.globalCompositeOperation = 'source-over';
+      drawCtx.strokeStyle = '#000000';
+      drawCtx.fillStyle = '#000000';
+      drawCtx.lineWidth = penSize;
       drawCtx.lineCap = 'round';
       drawCtx.lineJoin = 'round';
     }
 
     function drawPoint(p) {
       applyStrokeStyle();
-      const radius = currentTool === 'pen' ? penSize / 2
-                    : currentTool === 'highlighter' ? highlighterSize / 2
-                    : eraserSize / 2;
       drawCtx.beginPath();
-      drawCtx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      drawCtx.arc(p.x, p.y, penSize / 2, 0, Math.PI * 2);
       drawCtx.fill();
-      drawCtx.globalAlpha = 1;
     }
 
     function startDrawing(e) {
@@ -528,17 +427,15 @@
 
     function draw(e) {
       if (!isDrawing) return;
-      if (e.pointerId !== activePointerId) return; // ignore any other simultaneous touch
+      if (e.pointerId !== activePointerId) return;
       e.preventDefault();
       const currentPoint = getPos(e);
-
       if (lastPoint) {
         applyStrokeStyle();
         drawCtx.beginPath();
         drawCtx.moveTo(lastPoint.x, lastPoint.y);
         drawCtx.lineTo(currentPoint.x, currentPoint.y);
         drawCtx.stroke();
-        drawCtx.globalAlpha = 1;
       }
       lastPoint = currentPoint;
     }
@@ -560,6 +457,7 @@
       drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
     }
 
+    // ---- Folders / PDFs ----
     function createNewFolder() {
       const name = prompt("ENTER FOLDER NAME:");
       if (name) {
@@ -582,42 +480,41 @@
             <span>(${f.pdfs.length})</span>
           </div>
           <div class="pdf-list">
-            ${f.pdfs.map((pdf, idx) => `
-              <div class="pdf-item" onclick="event.stopPropagation(); loadPdfFromMemory('${f.id}',${idx})">
+            ${f.pdfs.length ? f.pdfs.map((pdf, idx) => `
+              <div class="pdf-item" onclick="event.stopPropagation(); openPdfFromMemory('${f.id}',${idx})">
                 📄 ${pdf.name}
               </div>
-            `).join('')}
+            `).join('') : '<div class="empty-hint">No PDFs yet — tap + LOAD PDF above.</div>'}
           </div>
         `;
         tree.appendChild(fEl);
       });
     }
 
-    document.getElementById('pdf-input').addEventListener('change', function(e) {
+    document.getElementById('pdf-input').addEventListener('change', function (e) {
       const file = e.target.files[0];
       if (!file) return;
-
       const reader = new FileReader();
-      reader.onload = function(evt) {
+      reader.onload = function (evt) {
         const typedarray = new Uint8Array(evt.target.result);
         const folder = folders.find(f => f.id === currentFolderId) || folders[0];
         folder.pdfs.push({ name: file.name, data: typedarray });
-        renderFolders();
-        renderPdfData(typedarray, file.name);
-        closeSidebar();
+        openPdf(typedarray, file.name);
       };
       reader.readAsArrayBuffer(file);
+      e.target.value = '';
     });
 
-    function loadPdfFromMemory(folderId, pdfIdx) {
+    // Tapping a PDF in the menu opens it straight into the viewer.
+    function openPdfFromMemory(folderId, pdfIdx) {
       const folder = folders.find(f => f.id === folderId);
       if (folder && folder.pdfs[pdfIdx]) {
-        renderPdfData(folder.pdfs[pdfIdx].data, folder.pdfs[pdfIdx].name);
-        closeSidebar();
+        openPdf(folder.pdfs[pdfIdx].data, folder.pdfs[pdfIdx].name);
       }
     }
 
-    function renderPdfData(typedarray, name) {
+    function openPdf(typedarray, name) {
+      showViewer();
       document.getElementById('status-text').innerText = "LOADING: " + name;
       pdfjsLib.getDocument(typedarray).promise.then(pdf => {
         pdfDoc = pdf;
@@ -632,14 +529,8 @@
       });
     }
 
-    // Renders a given page number of the currently loaded pdfDoc, saving the
-    // drawing layer of whatever page we're leaving and restoring any saved
-    // annotation for the page we're arriving on, so marks made on each page
-    // persist as you flip back and forth.
     function renderPage(num) {
-      if (!pdfDoc) return;
-      if (num < 1 || num > totalPages) return;
-
+      if (!pdfDoc || num < 1 || num > totalPages) return;
       saveCurrentPageAnnotation();
 
       pdfDoc.getPage(num).then(page => {
@@ -662,20 +553,11 @@
 
     function saveCurrentPageAnnotation() {
       if (!pdfDoc) return;
-      // Only save if the draw canvas actually matches the page we think we're on
-      // (guards against saving a stale/blank canvas on first load).
       pageAnnotations[currentPageNum] = drawCanvas.toDataURL();
     }
 
-    function nextPage() {
-      if (!pdfDoc || currentPageNum >= totalPages) return;
-      renderPage(currentPageNum + 1);
-    }
-
-    function prevPage() {
-      if (!pdfDoc || currentPageNum <= 1) return;
-      renderPage(currentPageNum - 1);
-    }
+    function nextPage() { if (pdfDoc && currentPageNum < totalPages) renderPage(currentPageNum + 1); }
+    function prevPage() { if (pdfDoc && currentPageNum > 1) renderPage(currentPageNum - 1); }
 
     function updatePageControls() {
       document.getElementById('page-info').innerText = `PAGE: ${currentPageNum} / ${totalPages}`;
@@ -683,10 +565,14 @@
       document.getElementById('btn-next-page').disabled = currentPageNum >= totalPages;
     }
 
-    // Export: flatten pdf + drawing layers to a PNG and trigger a download.
-    // The anchor is attached to the DOM before .click() and removed right
-    // after — some mobile browsers (notably iOS Safari) silently ignore
-    // clicks on detached anchors, which is why export previously did nothing.
+    // ---- Export ----
+    // iOS/iPadOS Safari ignores the anchor "download" attribute — clicking a
+    // download link just navigates to the data URL instead of saving a file,
+    // which is why export previously appeared to do nothing on iPad. The fix
+    // is the Web Share API: when available (iOS 15+, all iPad browsers use
+    // WebKit) it opens the native share sheet with "Save Image" / "Save to
+    // Files" built in. Desktop browsers without file-sharing support fall
+    // back to a normal blob download, which works reliably there.
     function downloadPage() {
       try {
         const tempCanvas = document.createElement('canvas');
@@ -698,15 +584,38 @@
         ctx.drawImage(pdfCanvas, 0, 0);
         ctx.drawImage(drawCanvas, 0, 0);
 
-        const dataUrl = tempCanvas.toDataURL('image/png');
-        const a = document.createElement('a');
-        a.download = 'annotated-doc.png';
-        a.href = dataUrl;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => document.body.removeChild(a), 100);
-        document.getElementById('status-text').innerText = "EXPORTED // annotated-doc.png";
+        tempCanvas.toBlob(async (blob) => {
+          if (!blob) {
+            document.getElementById('status-text').innerText = "EXPORT FAILED";
+            alert('Export failed: could not generate image.');
+            return;
+          }
+
+          const fileName = 'annotated-doc-page' + currentPageNum + '.png';
+          const file = new File([blob], fileName, { type: 'image/png' });
+
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({ files: [file], title: fileName });
+              document.getElementById('status-text').innerText = "EXPORTED // " + fileName;
+            } catch (shareErr) {
+              // User cancelled the share sheet, or share failed silently — no alert needed.
+              console.log('Share cancelled/failed:', shareErr);
+            }
+            return;
+          }
+
+          // Fallback for browsers without Web Share file support.
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+          document.getElementById('status-text').innerText = "EXPORTED // " + fileName;
+        }, 'image/png');
       } catch (err) {
         console.error('Export failed:', err);
         document.getElementById('status-text').innerText = "EXPORT FAILED";
@@ -719,4 +628,3 @@
   </script>
 </body>
 </html>
-
