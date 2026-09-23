@@ -1,9 +1,0 @@
-
-{
-  "name":"Centipede v4",
-  "short_name":"Centipede",
-  "start_url":"./index.html",
-  "display":"standalone",
-  "background_color":"#000000",
-  "theme_color":"#ff0033"
-}
