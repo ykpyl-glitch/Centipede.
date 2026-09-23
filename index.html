@@ -472,12 +472,21 @@
       const rect = drawCanvas.getBoundingClientRect();
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
-
-    function shouldAcceptPointer(e) {
-      // Rejects secondary multi-touch fingers (allows primary touch or pen/mouse)
-      if (e.pointerType === 'touch' && !e.isPrimary) return false;
-      return true;
+        function shouldAcceptPointer(e) {
+      // 1. The Apple Pencil is ALWAYS allowed
+      if (e.pointerType === 'pen') return true;
+      
+      // 2. If the finger fallback is turned on, allow touch (and mouse)
+      if (allowFingerDrawing) {
+        // Still reject secondary multi-touch fingers to prevent accidental palm marks
+        if (e.pointerType === 'touch' && !e.isPrimary) return false;
+        return true;
+      }
+      
+      // 3. Otherwise, block it (strict palm rejection)
+      return false;
     }
+
 
     function applyStrokeStyle() {
       drawCtx.globalAlpha = 1;
