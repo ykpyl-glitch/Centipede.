@@ -1,11 +1,10 @@
 {
-  "name": "Centipede PDF Annotator",
-  "short_name": "Centipede",
+  "name": "Cyber-Doc PDF System",
+  "short_name": "CyberDoc",
+  "start_url": "./index.html",
   "display": "standalone",
-  "start_url": "./",
-  "scope": "./",
-  "background_color": "#121212",
-  "theme_color": "#121212",
+  "background_color": "#000000",
+  "theme_color": "#ff0033",
   "icons": [
     {
       "src": "apple-touch-icon.png",
