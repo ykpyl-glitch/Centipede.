@@ -197,7 +197,19 @@
     #canvas-container.mode-draw .textLayer { pointer-events: none; user-select: none; -webkit-user-select: none; }
     
     #canvas-container.mode-select #draw-canvas { pointer-events: none; }
-    #canvas-container.mode-select .textLayer { pointer-events: auto; user-select: text; -webkit-user-select: text; cursor: text; }
+
+
+    #canvas-container.mode-select .textLayer { 
+  pointer-events: auto; 
+  user-select: none; 
+  -webkit-user-select: none; 
+  }
+    #canvas-container.mode-select .textLayer span { 
+  user-select: text; 
+  -webkit-user-select: text; 
+  cursor: text; 
+  }
+
 
     /* Page Navigation */
     .page-arrow {
