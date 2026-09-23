@@ -348,6 +348,7 @@
     let activePointerId = null;
     let allowFingerDrawing = false; 
     let interactionMode = 'draw'; // 'draw' or 'select'
+    let autoSavetimeout = null;
 
     let folders = []; 
     let currentFolderId = null;
@@ -612,8 +613,15 @@
       lastPoint = null;
       activePointerId = null;
       
-      if (wasDrawing) saveCurrentPageAnnotation();
+      if (wasDrawing) {
+        if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+        autoSaveTimeout = setTimeout(() => {
+          saveCurrentPageAnnotation();
+        }, 500); 
+      }
     }
+
+
 
     drawCanvas.addEventListener('pointerdown', startDrawing);
     drawCanvas.addEventListener('pointermove', draw);
