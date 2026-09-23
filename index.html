@@ -567,9 +567,13 @@
       drawCtx.fill();
     }
 
-    function startDrawing(e) {
+        function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
-      if (activePointerId !== null && activePointerId !== e.pointerId) return;
+
+      if (activePointerId !== null && activePointerId !== e.pointerId) {
+        isDrawing = false;
+      }
+      
       e.preventDefault();
       
       drawCanvas.setPointerCapture(e.pointerId);
@@ -579,6 +583,7 @@
       lastPoint = getPos(e);
       drawPoint(lastPoint);
     }
+
 
     function draw(e) {
       if (!isDrawing) return;
