@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>CENTIPEDE. // PDF & CANVAS SYSTEM</title>
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" href="apple-touch-icon.png">
@@ -129,7 +129,9 @@
       gap: 6px;
       white-space: nowrap;
       border-radius: 3px;
+      touch-action: manipulation;
     }
+
 
     .btn:hover { background: var(--accent-dim); }
     .btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
@@ -202,6 +204,7 @@
       cursor: pointer;
       z-index: 10;
       backdrop-filter: blur(2px);
+      touch-action: manipulation;
     }
     .page-arrow:active { background: var(--accent); color: #000; }
     .page-arrow.left { left: 12px; }
