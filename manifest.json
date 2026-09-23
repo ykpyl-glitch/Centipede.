@@ -1,6 +1,6 @@
 {
-  "name": "Cyber-Doc PDF System",
-  "short_name": "CyberDoc",
+  "name": "Centipede.",
+  "short_name": "Centipede.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#000000",
