@@ -340,22 +340,127 @@
     let lastPoint = null;
     let activePointerId = null; // only this pointer is allowed to draw
 
-    let folders = [{ id: 'default', name: 'ROOT_DOCS', pdfs: [] }];
-    let currentFolderId = 'default';
+    let folders = []; // populated from IndexedDB on startup — see initApp()
+    let currentFolderId = null;
 
     let pdfDoc = null;
     let currentPageNum = 1;
     let totalPages = 0;
     let currentPdfName = '';
-    let pageAnnotations = {};
+    let currentPdfId = null;
+    let pageAnnotations = {}; // in-memory cache of the current PDF's pages, mirrored to IndexedDB
 
     const pdfCanvas = document.getElementById('pdf-canvas');
     const pdfCtx = pdfCanvas.getContext('2d');
     const drawCanvas = document.getElementById('draw-canvas');
     const drawCtx = drawCanvas.getContext('2d');
 
+    // ---- Persistence (IndexedDB) ----
+    // Everything that makes up "your library" lives here, not just in the JS
+    // heap, so it survives a reload, closing the app, or restarting the iPad.
+    // Stores:
+    //   folders     {id, name}
+    //   pdfMeta     {id, folderId, name}          — lightweight, used for listing
+    //   pdfData     {id, data: ArrayBuffer}        — the actual PDF bytes
+    //   annotations {key: "<pdfId>_<page>", dataUrl} — one flattened drawing layer per page
+    const DB_NAME = 'centipede-db';
+    const DB_VERSION = 1;
+    let dbPromise = null;
+
+    function getDB() {
+      if (dbPromise) return dbPromise;
+      dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('folders')) db.createObjectStore('folders', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('pdfMeta')) {
+            const s = db.createObjectStore('pdfMeta', { keyPath: 'id' });
+            s.createIndex('folderId', 'folderId');
+          }
+          if (!db.objectStoreNames.contains('pdfData')) db.createObjectStore('pdfData', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('annotations')) db.createObjectStore('annotations', { keyPath: 'key' });
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      return dbPromise;
+    }
+
+    function idbPut(storeName, value) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put(value);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }));
+    }
+
+    function idbGet(storeName, key) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const req = db.transaction(storeName, 'readonly').objectStore(storeName).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      }));
+    }
+
+    function idbGetAll(storeName) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const req = db.transaction(storeName, 'readonly').objectStore(storeName).getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      }));
+    }
+
+    function idbDelete(storeName, key) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }));
+    }
+
+    function purgeAnnotationsForPdf(pdfId) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction('annotations', 'readwrite');
+        const req = tx.objectStore('annotations').openCursor();
+        req.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            if (cursor.value.key.startsWith(pdfId + '_')) cursor.delete();
+            cursor.continue();
+          }
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }));
+    }
+
+    // Loads the whole library (folders + PDF names) from IndexedDB at startup.
+    // PDF bytes themselves are only fetched when a PDF is actually opened, so
+    // the menu stays fast even with a lot of documents saved.
+    async function initApp() {
+      document.getElementById('status-text').innerText = "LOADING LIBRARY...";
+      let dbFolders = await idbGetAll('folders');
+      if (!dbFolders.length) {
+        const def = { id: 'default', name: 'ROOT_DOCS' };
+        await idbPut('folders', def);
+        dbFolders = [def];
+      }
+      const dbPdfMeta = await idbGetAll('pdfMeta');
+      folders = dbFolders.map(f => ({
+        ...f,
+        pdfs: dbPdfMeta.filter(p => p.folderId === f.id).map(p => ({ id: p.id, name: p.name }))
+      }));
+      currentFolderId = folders[0].id;
+      renderFolders();
+      document.getElementById('status-text').innerText = "SYSTEM READY // LIBRARY LOADED";
+    }
+
     // ---- View switching ----
-    function showMenu() {
+    async function showMenu() {
+      await saveCurrentPageAnnotation(); // persist whatever's on the page before leaving it
       document.getElementById('view-viewer').classList.remove('active');
       document.getElementById('view-menu').classList.add('active');
       renderFolders();
@@ -442,9 +547,13 @@
 
     function stopDrawing(e) {
       if (e && e.pointerId !== undefined && e.pointerId !== activePointerId) return;
+      const wasDrawing = isDrawing;
       isDrawing = false;
       lastPoint = null;
       activePointerId = null;
+      // Save immediately after every stroke — not just when switching pages —
+      // so closing the app mid-edit never loses a mark.
+      if (wasDrawing) saveCurrentPageAnnotation();
     }
 
     drawCanvas.addEventListener('pointerdown', startDrawing);
@@ -455,15 +564,49 @@
 
     function clearCanvas() {
       drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      saveCurrentPageAnnotation();
     }
 
     // ---- Folders / PDFs ----
-    function createNewFolder() {
+    async function createNewFolder() {
       const name = prompt("ENTER FOLDER NAME:");
-      if (name) {
-        folders.push({ id: 'folder_' + Date.now(), name: name.toUpperCase(), pdfs: [] });
-        renderFolders();
+      if (!name) return;
+      const folder = { id: 'folder_' + Date.now(), name: name.toUpperCase() };
+      await idbPut('folders', folder);
+      folders.push({ ...folder, pdfs: [] });
+      renderFolders();
+    }
+
+    async function deleteFolder(folderId, evt) {
+      evt.stopPropagation();
+      const folder = folders.find(f => f.id === folderId);
+      if (!folder) return;
+      if (!confirm(`Delete folder "${folder.name}" and all ${folder.pdfs.length} PDF(s) inside it? This cannot be undone.`)) return;
+      for (const pdf of folder.pdfs) {
+        await idbDelete('pdfMeta', pdf.id);
+        await idbDelete('pdfData', pdf.id);
+        await purgeAnnotationsForPdf(pdf.id);
       }
+      await idbDelete('folders', folderId);
+      folders = folders.filter(f => f.id !== folderId);
+      if (!folders.length) {
+        const def = { id: 'default', name: 'ROOT_DOCS' };
+        await idbPut('folders', def);
+        folders = [{ ...def, pdfs: [] }];
+      }
+      if (currentFolderId === folderId) currentFolderId = folders[0].id;
+      renderFolders();
+    }
+
+    async function deletePdf(folderId, pdfId, evt) {
+      evt.stopPropagation();
+      if (!confirm('Delete this PDF and its markup? This cannot be undone.')) return;
+      await idbDelete('pdfMeta', pdfId);
+      await idbDelete('pdfData', pdfId);
+      await purgeAnnotationsForPdf(pdfId);
+      const folder = folders.find(f => f.id === folderId);
+      if (folder) folder.pdfs = folder.pdfs.filter(p => p.id !== pdfId);
+      renderFolders();
     }
 
     function renderFolders() {
@@ -477,12 +620,16 @@
         fEl.innerHTML = `
           <div class="folder-header">
             <span>📁 ${f.name}</span>
-            <span>(${f.pdfs.length})</span>
+            <span style="display:flex;align-items:center;gap:8px;">
+              (${f.pdfs.length})
+              <button class="btn" style="padding:2px 6px;font-size:10px;" onclick="deleteFolder('${f.id}', event)">×</button>
+            </span>
           </div>
           <div class="pdf-list">
-            ${f.pdfs.length ? f.pdfs.map((pdf, idx) => `
-              <div class="pdf-item" onclick="event.stopPropagation(); openPdfFromMemory('${f.id}',${idx})">
-                📄 ${pdf.name}
+            ${f.pdfs.length ? f.pdfs.map(pdf => `
+              <div class="pdf-item" onclick="event.stopPropagation(); openPdfFromMemory('${pdf.id}')">
+                <span>📄 ${pdf.name}</span>
+                <button class="btn" style="padding:2px 6px;font-size:10px;" onclick="deletePdf('${f.id}','${pdf.id}', event)">×</button>
               </div>
             `).join('') : '<div class="empty-hint">No PDFs yet — tap + LOAD PDF above.</div>'}
           </div>
@@ -491,30 +638,31 @@
       });
     }
 
-    document.getElementById('pdf-input').addEventListener('change', function (e) {
+    document.getElementById('pdf-input').addEventListener('change', async function (e) {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function (evt) {
-        const typedarray = new Uint8Array(evt.target.result);
-        const folder = folders.find(f => f.id === currentFolderId) || folders[0];
-        folder.pdfs.push({ name: file.name, data: typedarray });
-        openPdf(typedarray, file.name);
-      };
-      reader.readAsArrayBuffer(file);
+      const arrayBuffer = await file.arrayBuffer();
+      const id = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      const meta = { id, folderId: currentFolderId, name: file.name };
+      await idbPut('pdfMeta', meta);
+      await idbPut('pdfData', { id, data: arrayBuffer });
+      const folder = folders.find(f => f.id === currentFolderId) || folders[0];
+      folder.pdfs.push({ id, name: file.name });
+      openPdf(new Uint8Array(arrayBuffer), file.name, id);
       e.target.value = '';
     });
 
     // Tapping a PDF in the menu opens it straight into the viewer.
-    function openPdfFromMemory(folderId, pdfIdx) {
-      const folder = folders.find(f => f.id === folderId);
-      if (folder && folder.pdfs[pdfIdx]) {
-        openPdf(folder.pdfs[pdfIdx].data, folder.pdfs[pdfIdx].name);
-      }
+    async function openPdfFromMemory(pdfId) {
+      const record = await idbGet('pdfData', pdfId);
+      if (!record) { alert('Could not load that PDF from storage.'); return; }
+      const meta = await idbGet('pdfMeta', pdfId);
+      openPdf(new Uint8Array(record.data), meta ? meta.name : 'Untitled.pdf', pdfId);
     }
 
-    function openPdf(typedarray, name) {
+    function openPdf(typedarray, name, pdfId) {
       showViewer();
+      currentPdfId = pdfId;
       document.getElementById('status-text').innerText = "LOADING: " + name;
       pdfjsLib.getDocument(typedarray).promise.then(pdf => {
         pdfDoc = pdf;
@@ -529,31 +677,38 @@
       });
     }
 
-    function renderPage(num) {
+    async function renderPage(num) {
       if (!pdfDoc || num < 1 || num > totalPages) return;
-      saveCurrentPageAnnotation();
+      await saveCurrentPageAnnotation(); // persist the page we're leaving
 
-      pdfDoc.getPage(num).then(page => {
-        const viewport = page.getViewport({ scale: 1.5 });
-        initCanvasSize(viewport.width, viewport.height);
-        page.render({ canvasContext: pdfCtx, viewport: viewport }).promise.then(() => {
-          currentPageNum = num;
-          drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-          const saved = pageAnnotations[num];
-          if (saved) {
-            const img = new Image();
-            img.onload = () => drawCtx.drawImage(img, 0, 0);
-            img.src = saved;
-          }
-          updatePageControls();
-          document.getElementById('status-text').innerText = "READY // " + currentPdfName;
-        });
-      });
+      const page = await pdfDoc.getPage(num);
+      const viewport = page.getViewport({ scale: 1.5 });
+      initCanvasSize(viewport.width, viewport.height);
+      await page.render({ canvasContext: pdfCtx, viewport: viewport }).promise;
+
+      currentPageNum = num;
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+
+      let saved = pageAnnotations[num];
+      if (saved === undefined) {
+        const rec = await idbGet('annotations', currentPdfId + '_' + num);
+        saved = rec ? rec.dataUrl : null;
+        pageAnnotations[num] = saved;
+      }
+      if (saved) {
+        const img = new Image();
+        img.onload = () => drawCtx.drawImage(img, 0, 0);
+        img.src = saved;
+      }
+      updatePageControls();
+      document.getElementById('status-text').innerText = "READY // " + currentPdfName;
     }
 
-    function saveCurrentPageAnnotation() {
-      if (!pdfDoc) return;
-      pageAnnotations[currentPageNum] = drawCanvas.toDataURL();
+    async function saveCurrentPageAnnotation() {
+      if (!pdfDoc || !currentPdfId) return;
+      const dataUrl = drawCanvas.toDataURL();
+      pageAnnotations[currentPageNum] = dataUrl;
+      await idbPut('annotations', { key: currentPdfId + '_' + currentPageNum, dataUrl });
     }
 
     function nextPage() { if (pdfDoc && currentPageNum < totalPages) renderPage(currentPageNum + 1); }
@@ -623,8 +778,8 @@
       }
     }
 
-    renderFolders();
     updatePageControls();
+    initApp();
   </script>
 </body>
 </html>
