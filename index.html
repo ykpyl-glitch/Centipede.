@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>CENTIPEDE. // PDF & CANVAS SYSTEM</title>
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+    :root {
+      --logo-red: #ff0033;
+      --accent: #e8e8ec;
+      --accent-dim: #3a3a42;
+      --border: #2c2c33;
+      --panel: #141417;
+      --panel-alt: #1c1c21;
+      --text-bright: #ffffff;
+      --text-dim: #9a9aa2;
+      --disabled-grey: #444449;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
+    html, body {
+      background-color: #050505;
+      color: var(--text-bright);
+      font-family: 'Share Tech Mono', monospace;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body { display: flex; flex-direction: column; }
+
+    header {
+      background: #000;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 13px;
+      color: var(--logo-red);
+    }
+
+    .brand svg { width: 26px; height: 26px; }
+
+    main {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .view {
+      display: none;
+      position: absolute;
+      inset: 0;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .view.active { display: flex; }
+
+    /* ---------- MAIN MENU VIEW ---------- */
+    #view-menu { padding: 20px; overflow-y: auto; }
+
+    .menu-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 13px;
+      color: var(--text-bright);
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .menu-actions { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .folder-tree { display: flex; flex-direction: column; gap: 10px; max-width: 700px; }
+    .folder-item { background: var(--panel); border: 1px solid var(--border); padding: 10px; cursor: pointer; }
+    .folder-item.active { border-color: var(--accent); background: var(--panel-alt); }
+    
+    .folder-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: bold;
+      color: var(--text-bright);
+      font-size: 13px;
+    }
+
+    .pdf-list { margin-top: 8px; padding-left: 6px; display: flex; flex-direction: column; gap: 6px; }
+    .pdf-item {
+      padding: 12px 10px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      word-break: break-all;
+      color: var(--text-dim);
+    }
+
+    .pdf-item:active, .pdf-item:hover { background: var(--accent); color: #000; }
+    .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; }
+
+    /* ---------- BUTTONS ---------- */
+    .btn {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      padding: 6px 10px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      border-radius: 3px;
+    }
+
+    .btn:hover { background: var(--accent-dim); }
+    .btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+    .btn:disabled { background: var(--panel); border-color: var(--disabled-grey); color: var(--disabled-grey); cursor: not-allowed; opacity: 0.6; }
+
+    /* ---------- VIEWER ---------- */
+    #view-viewer { flex-direction: column; }
+    .viewer-toolbar {
+      background: #000;
+      border-bottom: 1px solid var(--border);
+      padding: 8px 10px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .size-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      font-size: 10px;
+      flex-shrink: 0;
+      border-radius: 3px;
+      color: var(--text-dim);
+    }
+    .size-control input[type="range"] { accent-color: var(--accent); cursor: pointer; width: 70px; }
+    .size-control:has(input:disabled) { opacity: 0.5; }
+
+    .workspace {
+      flex: 1;
+      position: relative;
+      background: #080808;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: auto;
+    }
+
+    #canvas-container {
+      position: relative;
+      background: #ffffff;
+      box-shadow: 0 0 16px rgba(0, 0, 0, 0.5);
+      margin: auto;
+      transform-origin: top left;
+    }
+
+    canvas { position: absolute; top: 0; left: 0; touch-action: none; }
+    #pdf-canvas { z-index: 1; }
+    #draw-canvas { z-index: 2; cursor: crosshair; }
+
+    .page-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(20, 20, 23, 0.85);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 10;
+      backdrop-filter: blur(2px);
+    }
+    .page-arrow:active { background: var(--accent); color: #000; }
+    .page-arrow.left { left: 12px; }
+    .page-arrow.right { right: 12px; }
+    .page-arrow:disabled { opacity: 0.25; cursor: default; }
+
+    .page-pill {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 3px;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    .status-bar {
+      background: #000;
+      border-top: 1px solid var(--border);
+      padding: 5px 12px;
+      font-size: 10px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 100 100">
+        <path d="M5,50 Q50,10 95,50 Q50,90 5,50 Z" fill="#ffffff" stroke="#000" stroke-width="4"/>
+        <circle cx="50" cy="50" r="22" fill="#000"/>
+        <polygon points="50,32 58,40 42,40" fill="#ffffff"/>
+        <circle cx="50" cy="50" r="5" fill="#ff0033"/>
+      </svg>
+      CENTIPEDE.
+    </div>
+  </header>
+
+  <main>
+    <section id="view-menu" class="view active">
+      <div class="menu-title">// MAIN MENU</div>
+      <div class="menu-actions">
+        <button class="btn" onclick="document.getElementById('pdf-input').click()">+ LOAD PDF</button>
+        <button class="btn" onclick="createNewFolder()">+ NEW FOLDER</button>
+      </div>
+      <input type="file" id="pdf-input" accept="application/pdf" hidden>
+      <div id="folder-tree" class="folder-tree"></div>
+    </section>
+
+    <section id="view-viewer" class="view">
+      <div class="viewer-toolbar">
+        <button class="btn" onclick="showMenu()">☰ MENU</button>
+        <button id="btn-pen" class="btn active">PEN</button>
+        <div class="size-control">
+          <span>SIZE:</span>
+          <input type="range" id="pen-size" min="1" max="50" value="3" oninput="updatePenSize(this.value)">
+          <span id="pen-size-val">3px</span>
+        </div>
+        <button id="btn-highlighter" class="btn" disabled>HIGHLIGHT</button>
+        <button id="btn-eraser" class="btn" disabled>ERASER</button>
+        <button class="btn" onclick="clearCanvas()">CLEAR</button>
+        <button class="btn" onclick="downloadPage()">EXPORT</button>
+      </div>
+
+      <div class="workspace">
+        <button class="page-arrow left" id="btn-prev-page" onclick="prevPage()">◀</button>
+        <div id="canvas-container">
+          <canvas id="pdf-canvas"></canvas>
+          <canvas id="draw-canvas"></canvas>
+        </div>
+        <button class="page-arrow right" id="btn-next-page" onclick="nextPage()">▶</button>
+        <div class="page-pill" id="page-info">PAGE: 0 / 0</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="status-bar"><span id="status-text">SYSTEM READY // NO PDF LOADED</span></div>
+
+  <script>
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(console.error);
+      });
+    }
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const currentTool = 'pen';
+    let penSize = 3;
+    let isDrawing = false;
+    let lastPoint = null;
+    let activePointerId = null;
+
+    let folders = []; 
+    let currentFolderId = null;
+
+    let pdfDoc = null;
+    let currentPageNum = 1;
+    let totalPages = 0;
+    let currentPdfName = '';
+    let currentPdfId = null;
+    let pageAnnotations = {};
+
+    const pdfCanvas = document.getElementById('pdf-canvas');
+    const pdfCtx = pdfCanvas.getContext('2d', { alpha: false });
+    const drawCanvas = document.getElementById('draw-canvas');
+    const drawCtx = drawCanvas.getContext('2d');
+
+    const DB_NAME = 'centipede-db';
+    const DB_VERSION = 1;
+    let dbPromise = null;
+
+    function getDB() {
+      if (dbPromise) return dbPromise;
+      dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('folders')) db.createObjectStore('folders', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('pdfMeta')) {
+            const s = db.createObjectStore('pdfMeta', { keyPath: 'id' });
+            s.createIndex('folderId', 'folderId');
+          }
+          if (!db.objectStoreNames.contains('pdfData')) db.createObjectStore('pdfData', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('annotations')) db.createObjectStore('annotations', { keyPath: 'key' });
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      return dbPromise;
+    }
+
+    function idbPut(storeName, value) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put(value);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }));
+    }
+
+    function idbGet(storeName, key) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const req = db.transaction(storeName, 'readonly').objectStore(storeName).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      }));
+    }
+
+    function idbGetAll(storeName) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const req = db.transaction(storeName, 'readonly').objectStore(storeName).getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      }));
+    }
+
+    function idbDelete(storeName, key) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }));
+    }
+
+    function purgeAnnotationsForPdf(pdfId) {
+      return getDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction('annotations', 'readwrite');
+        const store = tx.objectStore('annotations');
+        const req = store.openCursor(IDBKeyRange.bound(pdfId + '_', pdfId + '_\uffff'));
+        req.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            cursor.delete();
+            cursor.continue();
+          }
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      }));
+    }
+
+    async function initApp() {
+      document.getElementById('status-text').innerText = "LOADING LIBRARY...";
+      let dbFolders = await idbGetAll('folders');
+      if (!dbFolders.length) {
+        const def = { id: 'default', name: 'ROOT_DOCS' };
+        await idbPut('folders', def);
+        dbFolders = [def];
+      }
+      const dbPdfMeta = await idbGetAll('pdfMeta');
+      folders = dbFolders.map(f => ({
+        ...f,
+        pdfs: dbPdfMeta.filter(p => p.folderId === f.id).map(p => ({ id: p.id, name: p.name }))
+      }));
+      currentFolderId = folders[0].id;
+      renderFolders();
+      document.getElementById('status-text').innerText = "SYSTEM READY // LIBRARY LOADED";
+    }
+
+    async function showMenu() {
+      await saveCurrentPageAnnotation();
+      document.getElementById('view-viewer').classList.remove('active');
+      document.getElementById('view-menu').classList.add('active');
+      renderFolders();
+    }
+    function showViewer() {
+      document.getElementById('view-menu').classList.remove('active');
+      document.getElementById('view-viewer').classList.add('active');
+    }
+
+    function updatePenSize(val) {
+      penSize = parseInt(val, 10);
+      document.getElementById('pen-size-val').innerText = val + 'px';
+    }
+
+    // UPDATED: HiDPI / Retina canvas setup
+    function initCanvasSize(w, h) {
+      const container = document.getElementById('canvas-container');
+      const dpr = window.devicePixelRatio || 1;
+
+      // Container uses CSS dimensions
+      container.style.width = w + 'px';
+      container.style.height = h + 'px';
+
+      // Canvas internal resolution scales by DPR
+      pdfCanvas.width = w * dpr;
+      pdfCanvas.height = h * dpr;
+      pdfCanvas.style.width = w + 'px';
+      pdfCanvas.style.height = h + 'px';
+
+      drawCanvas.width = w * dpr;
+      drawCanvas.height = h * dpr;
+      drawCanvas.style.width = w + 'px';
+      drawCanvas.style.height = h + 'px';
+
+      // Reset transforms and scale drawing context
+      drawCtx.setTransform(1, 0, 0, 1, 0, 0);
+      drawCtx.scale(dpr, dpr);
+    }
+
+    function getPos(e) {
+      const rect = drawCanvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function shouldAcceptPointer(e) {
+      if (e.pointerType === 'touch' && !e.isPrimary) return false;
+      return true;
+    }
+
+    function applyStrokeStyle() {
+      drawCtx.globalAlpha = 1;
+      drawCtx.globalCompositeOperation = 'source-over';
+      drawCtx.strokeStyle = '#000000';
+      drawCtx.fillStyle = '#000000';
+      drawCtx.lineWidth = penSize;
+      drawCtx.lineCap = 'round';
+      drawCtx.lineJoin = 'round';
+    }
+
+    function drawPoint(p) {
+      applyStrokeStyle();
+      drawCtx.beginPath();
+      drawCtx.arc(p.x, p.y, penSize / 2, 0, Math.PI * 2);
+      drawCtx.fill();
+    }
+
+    // UPDATED: Pointer Capture applied
+    function startDrawing(e) {
+      if (!shouldAcceptPointer(e)) return;
+      if (activePointerId !== null && activePointerId !== e.pointerId) return;
+      e.preventDefault();
+      
+      // Capture the pointer to prevent stroke clipping
+      drawCanvas.setPointerCapture(e.pointerId);
+      
+      activePointerId = e.pointerId;
+      isDrawing = true;
+      lastPoint = getPos(e);
+      drawPoint(lastPoint);
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+      if (e.pointerId !== activePointerId) return;
+      e.preventDefault();
+      const currentPoint = getPos(e);
+      if (lastPoint) {
+        applyStrokeStyle();
+        drawCtx.beginPath();
+        drawCtx.moveTo(lastPoint.x, lastPoint.y);
+        drawCtx.lineTo(currentPoint.x, currentPoint.y);
+        drawCtx.stroke();
+      }
+      lastPoint = currentPoint;
+    }
+
+    // UPDATED: Pointer Capture released
+    function stopDrawing(e) {
+      if (e && e.pointerId !== undefined && e.pointerId !== activePointerId) return;
+      
+      if (e && e.pointerId !== undefined && drawCanvas.hasPointerCapture(e.pointerId)) {
+        drawCanvas.releasePointerCapture(e.pointerId);
+      }
+
+      const wasDrawing = isDrawing;
+      isDrawing = false;
+      lastPoint = null;
+      activePointerId = null;
+      if (wasDrawing) saveCurrentPageAnnotation();
+    }
+
+    drawCanvas.addEventListener('pointerdown', startDrawing);
+    drawCanvas.addEventListener('pointermove', draw);
+    drawCanvas.addEventListener('pointerup', stopDrawing);
+    drawCanvas.addEventListener('pointercancel', stopDrawing);
+    drawCanvas.addEventListener('pointerleave', stopDrawing);
+
+    function clearCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      // Because context is scaled, clear bounds use unscaled width/height
+      drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+      saveCurrentPageAnnotation();
+    }
+
+    async function createNewFolder() {
+      const name = prompt("ENTER FOLDER NAME:");
+      if (!name) return;
+      const folder = { id: 'folder_' + Date.now(), name: name.toUpperCase() };
+      await idbPut('folders', folder);
+      folders.push({ ...folder, pdfs: [] });
+      renderFolders();
+    }
+
+    async function deleteFolder(folderId, evt) {
+      evt.stopPropagation();
+      const folder = folders.find(f => f.id === folderId);
+      if (!folder) return;
+      if (!confirm(`Delete folder "${folder.name}" and all ${folder.pdfs.length} PDF(s) inside it? This cannot be undone.`)) return;
+      for (const pdf of folder.pdfs) {
+        await idbDelete('pdfMeta', pdf.id);
+        await idbDelete('pdfData', pdf.id);
+        await purgeAnnotationsForPdf(pdf.id);
+      }
+      await idbDelete('folders', folderId);
+      folders = folders.filter(f => f.id !== folderId);
+      if (!folders.length) {
+        const def = { id: 'default', name: 'ROOT_DOCS' };
+        await idbPut('folders', def);
+        folders = [{ ...def, pdfs: [] }];
+      }
+      if (currentFolderId === folderId) currentFolderId = folders[0].id;
+      renderFolders();
+    }
+
+    async function deletePdf(folderId, pdfId, evt) {
+      evt.stopPropagation();
+      if (!confirm('Delete this PDF and its markup? This cannot be undone.')) return;
+      await idbDelete('pdfMeta', pdfId);
+      await idbDelete('pdfData', pdfId);
+      await purgeAnnotationsForPdf(pdfId);
+      const folder = folders.find(f => f.id === folderId);
+      if (folder) folder.pdfs = folder.pdfs.filter(p => p.id !== pdfId);
+      renderFolders();
+    }
+
+    function renderFolders() {
+      const tree = document.getElementById('folder-tree');
+      tree.innerHTML = '';
+
+      folders.forEach(f => {
+        const fEl = document.createElement('div');
+        fEl.className = 'folder-item' + (f.id === currentFolderId ? ' active' : '');
+        fEl.onclick = () => { currentFolderId = f.id; renderFolders(); };
+        fEl.innerHTML = `
+          <div class="folder-header">
+            <span>📁 ${f.name}</span>
+            <span style="display:flex;align-items:center;gap:8px;">
+              (${f.pdfs.length})
+              <button class="btn" style="padding:2px 6px;font-size:10px;" onclick="deleteFolder('${f.id}', event)">×</button>
+            </span>
+          </div>
+          <div class="pdf-list">
+            ${f.pdfs.length ? f.pdfs.map(pdf => `
+              <div class="pdf-item" onclick="event.stopPropagation(); openPdfFromMemory('${pdf.id}')">
+                <span>📄 ${pdf.name}</span>
+                <button class="btn" style="padding:2px 6px;font-size:10px;" onclick="deletePdf('${f.id}','${pdf.id}', event)">×</button>
+              </div>
+            `).join('') : '<div class="empty-hint">No PDFs yet — tap + LOAD PDF above.</div>'}
+          </div>
+        `;
+        tree.appendChild(fEl);
+      });
+    }
+
+    document.getElementById('pdf-input').addEventListener('change', async function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const arrayBuffer = await file.arrayBuffer();
+      const id = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      const meta = { id, folderId: currentFolderId, name: file.name };
+      await idbPut('pdfMeta', meta);
+      await idbPut('pdfData', { id, data: arrayBuffer });
+      const folder = folders.find(f => f.id === currentFolderId) || folders[0];
+      folder.pdfs.push({ id, name: file.name });
+      openPdf(new Uint8Array(arrayBuffer), file.name, id);
+      e.target.value = '';
+    });
+
+    async function openPdfFromMemory(pdfId) {
+      const record = await idbGet('pdfData', pdfId);
+      if (!record) { alert('Could not load that PDF from storage.'); return; }
+      const meta = await idbGet('pdfMeta', pdfId);
+      openPdf(new Uint8Array(record.data), meta ? meta.name : 'Untitled.pdf', pdfId);
+    }
+
+    function openPdf(typedarray, name, pdfId) {
+      showViewer();
+      currentPdfId = pdfId;
+      document.getElementById('status-text').innerText = "LOADING: " + name;
+      pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+        pdfDoc = pdf;
+        totalPages = pdf.numPages;
+        currentPdfName = name;
+        currentPageNum = 1;
+        pageAnnotations = {};
+        renderPage(1);
+      }).catch(err => {
+        document.getElementById('status-text').innerText = "ERROR LOADING PDF";
+        console.error(err);
+      });
+    }
+
+    // UPDATED: High DPI transform applied to PDF rendering and saved layer loading
+    async function renderPage(num) {
+      if (!pdfDoc || num < 1 || num > totalPages) return;
+      await saveCurrentPageAnnotation();
+
+      const page = await pdfDoc.getPage(num);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const dpr = window.devicePixelRatio || 1;
+      
+      initCanvasSize(viewport.width, viewport.height);
+
+      // Inject scaling directly into PDF.js rendering pipeline
+      const renderContext = {
+        canvasContext: pdfCtx,
+        viewport: viewport,
+        transform: [dpr, 0, 0, dpr, 0, 0]
+      };
+      
+      await page.render(renderContext).promise;
+
+      currentPageNum = num;
+      drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+
+      let saved = pageAnnotations[num];
+      if (saved === undefined) {
+        const rec = await idbGet('annotations', currentPdfId + '_' + num);
+        saved = rec ? rec.dataUrl : null;
+        pageAnnotations[num] = saved;
+      }
+      
+      if (saved) {
+        const img = new Image();
+        img.onload = () => {
+           // drawCtx scales naturally to CSS coordinates
+           drawCtx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+        };
+        img.src = saved;
+      }
+      updatePageControls();
+      document.getElementById('status-text').innerText = "READY // " + currentPdfName;
+    }
+
+    async function saveCurrentPageAnnotation() {
+      if (!pdfDoc || !currentPdfId) return;
+      const dataUrl = drawCanvas.toDataURL();
+      pageAnnotations[currentPageNum] = dataUrl;
+      await idbPut('annotations', { key: currentPdfId + '_' + currentPageNum, dataUrl });
+    }
+
+    function nextPage() { if (pdfDoc && currentPageNum < totalPages) renderPage(currentPageNum + 1); }
+    function prevPage() { if (pdfDoc && currentPageNum > 1) renderPage(currentPageNum - 1); }
+
+    function updatePageControls() {
+      document.getElementById('page-info').innerText = `PAGE: ${currentPageNum} / ${totalPages}`;
+      document.getElementById('btn-prev-page').disabled = currentPageNum <= 1;
+      document.getElementById('btn-next-page').disabled = currentPageNum >= totalPages;
+    }
+
+    function downloadPage() {
+      try {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = drawCanvas.width;
+        tempCanvas.height = drawCanvas.height;
+        const ctx = tempCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        ctx.drawImage(pdfCanvas, 0, 0);
+        ctx.drawImage(drawCanvas, 0, 0);
+
+        tempCanvas.toBlob(async (blob) => {
+          if (!blob) {
+            document.getElementById('status-text').innerText = "EXPORT FAILED";
+            alert('Export failed: could not generate image.');
+            return;
+          }
+
+          const fileName = 'annotated-doc-page' + currentPageNum + '.png';
+          const file = new File([blob], fileName, { type: 'image/png' });
+
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({ files: [file], title: fileName });
+              document.getElementById('status-text').innerText = "EXPORTED // " + fileName;
+            } catch (shareErr) {
+              console.log('Share cancelled/failed:', shareErr);
+            }
+            return;
+          }
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+          document.getElementById('status-text').innerText = "EXPORTED // " + fileName;
+        }, 'image/png');
+      } catch (err) {
+        console.error('Export failed:', err);
+        document.getElementById('status-text').innerText = "EXPORT FAILED";
+        alert('Export failed: ' + err.message);
+      }
+    }
+
+    updatePageControls();
+    initApp();
+  </script>
+</body>
+</html>
