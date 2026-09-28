@@ -344,6 +344,7 @@
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
 <body>
 
@@ -387,9 +388,7 @@
         </div>
         
         <button class="btn" onclick="clearCanvas()">CLEAR</button>
-        <button class="btn" onclick="downloadPage()">EXPORT</button>
-        
-        <!-- Toggle button pushed to the far right -->
+        <button class="btn" onclick="exportFullPdf()">EXPORT</button>
         <button id="btn-mode-toggle" class="btn active" onclick="toggleInteractionMode()" style="margin-left: auto;">MODE: DRAW</button>
       </div>
 
@@ -962,40 +961,61 @@
       document.getElementById('btn-prev-page').disabled = currentPageNum <= 1;
       document.getElementById('btn-next-page').disabled = currentPageNum >= totalPages;
     }
-
-    function downloadPage() {
+        async function exportFullPdf() {
       try {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = drawCanvas.width;
-        tempCanvas.height = drawCanvas.height;
-        const ctx = tempCanvas.getContext('2d');
+        if (!currentPdfId) return;
         
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-        ctx.drawImage(pdfCanvas, 0, 0);
-        ctx.drawImage(drawCanvas, 0, 0);
-
-        const dataUrl = tempCanvas.toDataURL('image/png');
-        const byteString = atob(dataUrl.split(',')[1]);
-        const arrayBuffer = new ArrayBuffer(byteString.length);
-        const int8Array = new Uint8Array(arrayBuffer);
-        
-        for (let i = 0; i < byteString.length; i++) {
-          int8Array[i] = byteString.charCodeAt(i);
+        document.getElementById('status-text').innerText = "EXPORTING FULL PDF... PLEASE WAIT";
+        await saveCurrentPageAnnotation();
+        const record = await idbGet('pdfData', currentPdfId);
+        if (!record || !record.data) throw new Error("Could not load original PDF data.");
+        const { PDFDocument } = PDFLib;
+        const pdf = await PDFDocument.load(record.data);
+        const pages = pdf.getPages();
+        for (let i = 0; i < pages.length; i++) {
+          const pageNum = i + 1;
+          let annotationData = pageAnnotations[pageNum];
+          if (annotationData === undefined) {
+             const rec = await idbGet('annotations', currentPdfId + '_' + pageNum);
+             if (rec && rec.data) annotationData = rec.data;
+             else if (rec && rec.dataUrl) annotationData = rec.dataUrl;
+          }
+          if (annotationData) {
+            let pngImageBytes;
+            if (annotationData instanceof Blob) {
+              pngImageBytes = await annotationData.arrayBuffer();
+            } else if (typeof annotationData === 'string' && annotationData.startsWith('data:image/png;base64,')) {
+               // Fallback for older base64 saves
+               const b64 = annotationData.split(',')[1];
+               const binStr = atob(b64);
+               const arr = new Uint8Array(binStr.length);
+               for (let k = 0; k < binStr.length; k++) arr[k] = binStr.charCodeAt(k);
+               pngImageBytes = arr.buffer;
+            }
+            
+            if (pngImageBytes) {
+               const pngImage = await pdf.embedPng(pngImageBytes);
+               const page = pages[i];
+               const { width, height } = page.getSize();
+               
+               // Draw the transparent layer perfectly stretched over the page
+               page.drawImage(pngImage, {
+                 x: 0,
+                 y: 0,
+                 width: width,
+                 height: height
+               });
+            }
+          }
         }
-        
-        const blob = new Blob([int8Array], { type: 'image/png' });
-        const fileName = 'annotated-doc-page' + currentPageNum + '.png';
-        const file = new File([blob], fileName, { type: 'image/png' });
-
+        const pdfBytes = await pdf.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const fileName = (currentPdfName.replace('.pdf', '') || 'Document') + '_Annotated.pdf';
+        const file = new File([blob], fileName, { type: 'application/pdf' });
+        )
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          navigator.share({ files: [file], title: fileName })
-            .then(() => {
-              document.getElementById('status-text').innerText = "EXPORTED // " + fileName;
-            })
-            .catch((shareErr) => {
-              console.log('Share cancelled:', shareErr);
-            });
+          await navigator.share({ files: [file], title: fileName });
+          document.getElementById('status-text').innerText = "EXPORTED // " + fileName;
         } else {
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -1014,6 +1034,8 @@
       }
     }
 
+
+    
     updatePageControls();
     initApp();
   </script>
