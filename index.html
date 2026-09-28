@@ -235,7 +235,14 @@
     canvas, .textLayer { position: absolute; top: 0; left: 0; }
     #pdf-canvas { z-index: 1; touch-action: none; }
     .textLayer { z-index: 2; opacity: 0.5; } 
-    #draw-canvas { z-index: 3; touch-action: none; cursor: crosshair; }
+        #draw-canvas { 
+      z-index: 3; 
+      touch-action: none; 
+      cursor: crosshair; 
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
 
     #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
     #canvas-container.mode-select #draw-canvas { pointer-events: none; }
