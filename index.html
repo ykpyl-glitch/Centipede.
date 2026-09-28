@@ -719,27 +719,30 @@
       renderFolders();
     }
 
-    function renderFolders() {
+        function renderFolders() {
       const tree = document.getElementById('folder-tree');
       tree.innerHTML = '';
 
-      folders.forEach(f => {
+      folders.forEach((f, index) => {
         const fEl = document.createElement('div');
         fEl.className = 'folder-item' + (f.id === currentFolderId ? ' active' : '');
+        fEl.style.opacity = '0'; 
+        fEl.style.animation = `viewFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards ${index * 0.05}s`;
+        
         fEl.onclick = () => { currentFolderId = f.id; renderFolders(); };
         fEl.innerHTML = `
           <div class="folder-header">
             <span>📁 ${f.name}</span>
             <span style="display:flex;align-items:center;gap:8px;">
               (${f.pdfs.length})
-              <button class="btn" style="padding:2px 6px;font-size:10px;" onclick="deleteFolder('${f.id}', event)">×</button>
+              <button class="btn" style="padding:4px 8px;font-size:10px;" onclick="deleteFolder('${f.id}', event)">×</button>
             </span>
           </div>
           <div class="pdf-list">
             ${f.pdfs.length ? f.pdfs.map(pdf => `
               <div class="pdf-item" onclick="event.stopPropagation(); openPdfFromMemory('${pdf.id}')">
                 <span>📄 ${pdf.name}</span>
-                <button class="btn" style="padding:2px 6px;font-size:10px;" onclick="deletePdf('${f.id}','${pdf.id}', event)">×</button>
+                <button class="btn" style="padding:4px 8px;font-size:10px;" onclick="deletePdf('${f.id}','${pdf.id}', event)">×</button>
               </div>
             `).join('') : '<div class="empty-hint">No PDFs yet — tap + LOAD PDF above.</div>'}
           </div>
