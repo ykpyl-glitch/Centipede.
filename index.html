@@ -125,23 +125,40 @@
     .pdf-item:active, .pdf-item:hover { background: var(--accent); color: #000; }
     .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; }
 
-    /* ---------- BUTTONS ---------- */
     .btn {
       background: var(--panel);
       border: 1px solid var(--border);
       color: var(--text-bright);
-      padding: 6px 10px;
+      padding: 8px 12px;
       font-family: 'Share Tech Mono', monospace;
       font-size: 11px;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.05em;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       white-space: nowrap;
-      border-radius: 3px;
+      border-radius: 6px; /* Slightly rounder, modern feel */
       touch-action: manipulation;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); /* Smooth fading */
     }
+
+    .btn:hover { 
+      background: var(--accent-dim); 
+      transform: translateY(-1px); /* Lifts up slightly on hover */
+    }
+    
+    .btn:active {
+      transform: translateY(1px); /* Physically pushes down when tapped */
+    }
+    
+    .btn.active { 
+      background: var(--text-bright); /* High contrast for active tools */
+      color: #000; 
+      border-color: var(--text-bright); 
+      font-weight: bold;
+    }
+
 
     .btn:hover { background: var(--accent-dim); }
     .btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
