@@ -672,26 +672,35 @@
       drawCtx.fill();
     }
 
-    function startDrawing(e) {
+        function startDrawing(e) {
+      // FIX 1: Aggressively prevent default iPadOS gestures (like scrolling)
+      // for ALL touches. If the palm isn't blocked here, it swallows the next pencil stroke.
+      e.preventDefault();
+
       if (!shouldAcceptPointer(e)) return;
       
+      // FIX 2: Force-clear any stuck locks if Safari dropped a previous event
       if (activePointerId !== null && activePointerId !== e.pointerId) {
         isDrawing = false;
+        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
       }
-      
-      e.preventDefault();
-      drawCanvas.setPointerCapture(e.pointerId);
       
       activePointerId = e.pointerId;
       isDrawing = true;
       lastPoint = getPos(e);
+      
+      // FIX 3: Try/catch prevents a rare Safari bug that halts scripts if the canvas loses focus
+      try { drawCanvas.setPointerCapture(activePointerId); } catch (err) {}
+      
       drawPoint(lastPoint);
     }
 
     function draw(e) {
+      e.preventDefault();
+      
       if (!isDrawing) return;
       if (e.pointerId !== activePointerId) return;
-      e.preventDefault();
+      
       const currentPoint = getPos(e);
       if (lastPoint) {
         applyStrokeStyle();
@@ -705,10 +714,23 @@
 
     function stopDrawing(e) {
       if (e && e.pointerId !== undefined && e.pointerId !== activePointerId) return;
-      
-      if (e && e.pointerId !== undefined && drawCanvas.hasPointerCapture(e.pointerId)) {
-        drawCanvas.releasePointerCapture(e.pointerId);
+
+      const wasDrawing = isDrawing;
+      isDrawing = false;
+      lastPoint = null;
+      if (activePointerId !== null) {
+        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
+        activePointerId = null;
       }
+      
+      if (wasDrawing) {
+        if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+        autoSaveTimeout = setTimeout(() => {
+          saveCurrentPageAnnotation();
+        }, 500); 
+      }
+    }
+
 
       const wasDrawing = isDrawing;
       isDrawing = false;
