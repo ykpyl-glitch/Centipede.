@@ -143,6 +143,7 @@
     .pdf-item:hover { background: var(--text-bright); color: #000; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1); }
     .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; opacity: 0.7; }
 
+    /* ---------- BUTTONS & TOOL GROUPS ---------- */
     .btn {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -154,7 +155,6 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      white-space: nowrap;
       border-radius: 6px; 
       touch-action: manipulation;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -223,7 +223,6 @@
     }
     .size-preview-dot { border-radius: 50%; }
 
-    /* Custom Range Slider */
     input[type=range] { -webkit-appearance: none; background: transparent; flex: 1; }
     input[type=range]:focus { outline: none; }
     input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #2c2c33; border-radius: 2px; }
@@ -254,6 +253,7 @@
     #pdf-canvas { z-index: 1; touch-action: none; }
     .textLayer { z-index: 2; opacity: 0.5; } 
     
+    /* MULTIPLY BLEND MODE applied directly to the canvas HTML element. */
     #draw-canvas { 
       z-index: 3; 
       touch-action: none; 
@@ -346,7 +346,7 @@
       <div class="viewer-toolbar">
         <button class="btn" onclick="showMenu()">☰ MENU</button>
         
-        <!-- Pen Tool -->
+        <!-- Pen Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-pen" class="btn active" onclick="handleToolClick('pen')">PEN</button>
           <div id="popover-pen" class="tool-popover">
@@ -357,7 +357,7 @@
                 <div class="color-swatch" style="background:#2962ff;" onclick="updateToolSettings('pen', 'color', '#2962ff')"></div>
                 <div class="color-swatch" style="background:#00c853;" onclick="updateToolSettings('pen', 'color', '#00c853')"></div>
               </div>
-              <input type="color" id="pen-color-picker" onchange="updateToolSettings('pen', 'color', this.value)">
+              <input type="color" id="pen-color-picker" value="#000000" onchange="updateToolSettings('pen', 'color', this.value)">
             </div>
             <div class="popover-row">
               <input type="range" min="1" max="25" value="3" oninput="updateToolSettings('pen', 'size', this.value)">
@@ -366,7 +366,7 @@
           </div>
         </div>
 
-        <!-- Highlighter Tool -->
+        <!-- Highlighter Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-highlighter" class="btn" onclick="handleToolClick('highlighter')">HIGHLIGHT</button>
           <div id="popover-highlighter" class="tool-popover">
@@ -377,7 +377,7 @@
                 <div class="color-swatch" style="background:#00e5ff;" onclick="updateToolSettings('highlighter', 'color', '#00e5ff')"></div>
                 <div class="color-swatch" style="background:#f50057;" onclick="updateToolSettings('highlighter', 'color', '#f50057')"></div>
               </div>
-              <input type="color" id="hl-color-picker" onchange="updateToolSettings('highlighter', 'color', this.value)">
+              <input type="color" id="hl-color-picker" value="#ffeb3b" onchange="updateToolSettings('highlighter', 'color', this.value)">
             </div>
             <div class="popover-row">
               <input type="range" min="4" max="60" value="12" oninput="updateToolSettings('highlighter', 'size', this.value)">
@@ -386,7 +386,7 @@
           </div>
         </div>
 
-        <!-- Eraser Tool -->
+        <!-- Eraser Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-eraser" class="btn" onclick="handleToolClick('eraser')">ERASE</button>
           <div id="popover-eraser" class="tool-popover">
@@ -549,7 +549,7 @@
 
     async function initApp() {
       document.getElementById('status-text').innerText = "LOADING LIBRARY...";
-      updatePreviews(); // Sync UI tools on load
+      updatePreviews();
       
       let dbFolders = await idbGetAll('folders');
       if (!dbFolders.length) {
@@ -747,7 +747,7 @@
         drawCtx.fillStyle = '#000';
         drawCtx.lineWidth = toolSettings.eraser.size;
       } else if (currentTool === 'highlighter') {
-        drawCtx.globalAlpha = 1; // Handled natively by Multiply Blend Mode
+        drawCtx.globalAlpha = 1; 
         drawCtx.globalCompositeOperation = 'source-over';
         drawCtx.strokeStyle = toolSettings.highlighter.color; 
         drawCtx.fillStyle = toolSettings.highlighter.color;
