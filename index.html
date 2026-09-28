@@ -253,7 +253,6 @@
     #pdf-canvas { z-index: 1; touch-action: none; }
     .textLayer { z-index: 2; opacity: 0.5; } 
     
-    /* MULTIPLY BLEND MODE applied directly to the canvas HTML element. */
     #draw-canvas { 
       z-index: 3; 
       touch-action: none; 
@@ -401,7 +400,7 @@
         <button class="btn" onclick="clearCanvas()">CLEAR</button>
         <button class="btn" onclick="exportFullPdf()">EXPORT</button>
 
-        <!-- Right Side Cluster (Undo, Redo, Mode) -->
+        <!-- Right Side Cluster: UNDO & REDO immediately left of MODE -->
         <div style="margin-left: auto; display: flex; gap: 6px;">
           <button class="btn" onclick="undoCanvas()">↩ UNDO</button>
           <button class="btn" onclick="redoCanvas()">REDO ↪</button>
@@ -568,7 +567,7 @@
     }
 
     // --- UI MANAGER ---
-    function showMenu() {
+    async function showMenu() {
       closePopovers();
       await saveCurrentPageAnnotation();
       document.getElementById('view-viewer').classList.remove('active');
@@ -636,7 +635,7 @@
     }
 
     function updateToolSettings(tool, prop, value) {
-      toolSettings[tool][prop] = value;
+      toolSettings[tool][prop] = (prop === 'size') ? parseInt(value, 10) : value;
       
       if (prop === 'color') {
         if (tool === 'pen') document.getElementById('pen-color-picker').value = value;
@@ -658,8 +657,8 @@
       hlDot.style.opacity = 0.4; 
 
       const erDot = document.getElementById('eraser-preview-dot');
-      erDot.style.width = toolSettings.eraser.size + 'px';
-      erDot.style.height = toolSettings.eraser.size + 'px';
+      erDot.style.width = Math.min(toolSettings.eraser.size, 40) + 'px';
+      erDot.style.height = Math.min(toolSettings.eraser.size, 40) + 'px';
       erDot.style.backgroundColor = '#ffffff'; 
     }
 
