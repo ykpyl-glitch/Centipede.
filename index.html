@@ -344,7 +344,7 @@
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
 <body>
 
@@ -672,14 +672,13 @@
       drawCtx.fill();
     }
 
-        function startDrawing(e) {
-      // FIX 1: Aggressively prevent default iPadOS gestures (like scrolling)
-      // for ALL touches. If the palm isn't blocked here, it swallows the next pencil stroke.
+    function startDrawing(e) {
+      // Aggressively prevent default iPadOS gestures
       e.preventDefault();
 
       if (!shouldAcceptPointer(e)) return;
       
-      // FIX 2: Force-clear any stuck locks if Safari dropped a previous event
+      // Force-clear any stuck locks
       if (activePointerId !== null && activePointerId !== e.pointerId) {
         isDrawing = false;
         try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
@@ -689,7 +688,6 @@
       isDrawing = true;
       lastPoint = getPos(e);
       
-      // FIX 3: Try/catch prevents a rare Safari bug that halts scripts if the canvas loses focus
       try { drawCanvas.setPointerCapture(activePointerId); } catch (err) {}
       
       drawPoint(lastPoint);
@@ -718,24 +716,11 @@
       const wasDrawing = isDrawing;
       isDrawing = false;
       lastPoint = null;
+      
       if (activePointerId !== null) {
         try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
         activePointerId = null;
       }
-      
-      if (wasDrawing) {
-        if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
-        autoSaveTimeout = setTimeout(() => {
-          saveCurrentPageAnnotation();
-        }, 500); 
-      }
-    }
-
-
-      const wasDrawing = isDrawing;
-      isDrawing = false;
-      lastPoint = null;
-      activePointerId = null;
       
       if (wasDrawing) {
         if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
@@ -983,6 +968,7 @@
       document.getElementById('btn-prev-page').disabled = currentPageNum <= 1;
       document.getElementById('btn-next-page').disabled = currentPageNum >= totalPages;
     }
+
     async function exportFullPdf() {
       try {
         if (!currentPdfId) return;
@@ -1056,9 +1042,6 @@
         alert('Export failed: ' + err.message);
       }
     }
-
-
-
     
     updatePageControls();
     initApp();
