@@ -217,11 +217,22 @@
     input[type="color"]::-webkit-color-swatch { border: 2px solid var(--border); border-radius: 50%; }
     
     .size-preview-container {
-      width: 44px; height: 44px; 
-      display: flex; align-items: center; justify-content: center;
-      background: #000; border-radius: 6px; border: 1px solid var(--border);
+      width: 44px; 
+      height: 44px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      background: #2a2a30; 
+      border-radius: 6px; 
+      border: 1px solid var(--border);
+      overflow: hidden;
+      flex-shrink: 0;
     }
-    .size-preview-dot { border-radius: 50%; }
+    .size-preview-dot { 
+      border-radius: 50%; 
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.15); 
+      transition: width 0.05s ease, height 0.05s ease;
+    }
 
     input[type=range] { -webkit-appearance: none; background: transparent; flex: 1; }
     input[type=range]:focus { outline: none; }
@@ -380,7 +391,7 @@
             </div>
             <div class="popover-row">
               <input type="range" min="4" max="60" value="12" oninput="updateToolSettings('highlighter', 'size', this.value)">
-              <div class="size-preview-container" style="background:#fff;"><div id="hl-preview-dot" class="size-preview-dot"></div></div>
+              <div class="size-preview-container"><div id="hl-preview-dot" class="size-preview-dot"></div></div>
             </div>
           </div>
         </div>
@@ -397,7 +408,10 @@
         </div>
         
         <button id="btn-touch-toggle" class="btn" onclick="toggleFingerDrawing()">FINGER: OFF</button>
-        <button class="btn" onclick="clearCanvas()">CLEAR</button>
+        
+        <!-- Updated Clear Page Button -->
+        <button class="btn" onclick="clearCurrentPage()">CLEAR PAGE</button>
+        
         <button class="btn" onclick="exportFullPdf()">EXPORT</button>
 
         <!-- Right Side Cluster: UNDO & REDO immediately left of MODE -->
@@ -644,22 +658,30 @@
       updatePreviews();
     }
 
+    // Updated Clamped Previews Logic
     function updatePreviews() {
+      // PEN PREVIEW (Clamped to 38px visual max)
       const penDot = document.getElementById('pen-preview-dot');
-      penDot.style.width = toolSettings.pen.size + 'px';
-      penDot.style.height = toolSettings.pen.size + 'px';
+      const visualPenSize = Math.min(toolSettings.pen.size, 38);
+      penDot.style.width = visualPenSize + 'px';
+      penDot.style.height = visualPenSize + 'px';
       penDot.style.backgroundColor = toolSettings.pen.color;
 
+      // HIGHLIGHTER PREVIEW
       const hlDot = document.getElementById('hl-preview-dot');
-      hlDot.style.width = toolSettings.highlighter.size + 'px';
-      hlDot.style.height = toolSettings.highlighter.size + 'px';
+      const visualHlSize = Math.min(toolSettings.highlighter.size, 38);
+      hlDot.style.width = visualHlSize + 'px';
+      hlDot.style.height = visualHlSize + 'px';
       hlDot.style.backgroundColor = toolSettings.highlighter.color;
-      hlDot.style.opacity = 0.4; 
+      hlDot.style.opacity = '0.75'; 
 
+      // ERASER PREVIEW (Scaled down so 80px fits in the 44px box comfortably)
       const erDot = document.getElementById('eraser-preview-dot');
-      erDot.style.width = Math.min(toolSettings.eraser.size, 40) + 'px';
-      erDot.style.height = Math.min(toolSettings.eraser.size, 40) + 'px';
+      const visualEraserSize = Math.min(Math.round(toolSettings.eraser.size * (38 / 80) + 4), 38);
+      erDot.style.width = visualEraserSize + 'px';
+      erDot.style.height = visualEraserSize + 'px';
       erDot.style.backgroundColor = '#ffffff'; 
+      erDot.style.border = '1px solid rgba(0, 0, 0, 0.4)';
     }
 
     function toggleFingerDrawing() {
@@ -729,12 +751,14 @@
       saveCurrentPageAnnotation();
     }
 
-    function clearCanvas() {
+    // Updated Clear Page Function
+    function clearCurrentPage() {
       closePopovers();
       pushStateToHistory(); 
       const dpr = window.devicePixelRatio || 1;
       drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
       saveCurrentPageAnnotation();
+      document.getElementById('status-text').innerText = `CLEARED // PAGE ${currentPageNum}`;
     }
 
     // --- DRAWING ENGINE ---
