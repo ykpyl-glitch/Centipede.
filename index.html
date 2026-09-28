@@ -8,7 +8,6 @@
   <link rel="icon" type="image/png" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.json">
   
-  <!-- PDF.js standard styles required for the Text Layer -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
   
   <style>
@@ -26,15 +25,15 @@
       --disabled-grey: #444449;
     }
 
+    /* Strict iOS text selection reset */
     * { 
-  box-sizing: border-box; 
-  margin: 0; 
-  padding: 0; 
-  user-select: none; 
-  -webkit-user-select: none; 
-  -webkit-touch-callout: none; 
-  }
-
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      user-select: none; 
+      -webkit-user-select: none; 
+      -webkit-touch-callout: none; 
+    }
 
     html, body {
       background-color: #050505;
@@ -197,27 +196,23 @@
     /* Z-INDEX STACKING */
     canvas, .textLayer { position: absolute; top: 0; left: 0; }
     #pdf-canvas { z-index: 1; touch-action: none; }
-    .textLayer { z-index: 2; opacity: 0.5; /* Opacity only affects selection highlight color, text is transparent */ } 
+    .textLayer { z-index: 2; opacity: 0.5; } 
     #draw-canvas { z-index: 3; touch-action: none; cursor: crosshair; }
 
     /* MODE TOGGLES */
     #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
-    #canvas-container.mode-draw .textLayer { pointer-events: none; user-select: none; -webkit-user-select: none; }
-    
     #canvas-container.mode-select #draw-canvas { pointer-events: none; }
-
-
+    
     #canvas-container.mode-select .textLayer { 
-  pointer-events: auto; 
-  user-select: none; 
-  -webkit-user-select: none; 
-  }
+      pointer-events: auto; 
+      user-select: none; 
+      -webkit-user-select: none; 
+    }
     #canvas-container.mode-select .textLayer span { 
-  user-select: text; 
-  -webkit-user-select: text; 
-  cursor: text; 
-  }
-
+      user-select: text; 
+      -webkit-user-select: text; 
+      cursor: text; 
+    }
 
     /* Page Navigation */
     .page-arrow {
@@ -297,17 +292,21 @@
 
     <section id="view-viewer" class="view">
       <div class="viewer-toolbar">
-        <!-- New Mode Toggle on the far left -->
         <button id="btn-mode-toggle" class="btn active" onclick="toggleInteractionMode()">MODE: DRAW</button>
-        
         <button class="btn" onclick="showMenu()">☰ MENU</button>
-        <button id="btn-pen" class="btn active">PEN</button>
+        
+        <!-- ENABLING THE ERASER BUTTON -->
+        <button id="btn-pen" class="btn active" onclick="setTool('pen')">PEN</button>
+        <button id="btn-eraser" class="btn" onclick="setTool('eraser')">ERASER</button>
+        
         <button id="btn-touch-toggle" class="btn" onclick="toggleFingerDrawing()">FINGER: OFF</button>
+        
         <div class="size-control">
           <span>SIZE:</span>
           <input type="range" id="pen-size" min="1" max="50" value="3" oninput="updatePenSize(this.value)">
           <span id="pen-size-val">3px</span>
         </div>
+        
         <button class="btn" onclick="clearCanvas()">CLEAR</button>
         <button class="btn" onclick="downloadPage()">EXPORT</button>
       </div>
@@ -315,10 +314,8 @@
       <div class="workspace">
         <button class="page-arrow left" id="btn-prev-page" onclick="prevPage()">◀</button>
         
-        <!-- Added mode-draw class by default -->
         <div id="canvas-container" class="mode-draw">
           <canvas id="pdf-canvas"></canvas>
-          <!-- New Text Layer -->
           <div id="text-layer" class="textLayer"></div>
           <canvas id="draw-canvas"></canvas>
         </div>
@@ -341,14 +338,14 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     // State
-    const currentTool = 'pen';
+    let currentTool = 'pen'; // Now dynamically updated
     let penSize = 3;
     let isDrawing = false;
     let lastPoint = null;
     let activePointerId = null;
     let allowFingerDrawing = false; 
-    let interactionMode = 'draw'; // 'draw' or 'select'
-    let autoSavetimeout = null;
+    let interactionMode = 'draw'; 
+    let autoSaveTimeout = null;
 
     let folders = []; 
     let currentFolderId = null;
@@ -470,7 +467,6 @@
       document.getElementById('view-viewer').classList.add('active');
     }
 
-    // --- NEW MODE TOGGLE ---
     function toggleInteractionMode() {
       const container = document.getElementById('canvas-container');
       const btn = document.getElementById('btn-mode-toggle');
@@ -487,6 +483,18 @@
         btn.classList.add('active');
         container.classList.remove('mode-select');
         container.classList.add('mode-draw');
+      }
+    }
+
+    // --- NEW TOOL SELECTOR ENGINE ---
+    function setTool(toolName) {
+      currentTool = toolName;
+      document.getElementById('btn-pen').classList.toggle('active', toolName === 'pen');
+      document.getElementById('btn-eraser').classList.toggle('active', toolName === 'eraser');
+      
+      // Auto-switch to DRAW mode if user taps a tool while in SELECT mode
+      if (interactionMode === 'select') {
+         toggleInteractionMode();
       }
     }
 
@@ -511,16 +519,13 @@
       const container = document.getElementById('canvas-container');
       const dpr = window.devicePixelRatio || 1;
 
-      // Container uses CSS dimensions
       container.style.width = w + 'px';
       container.style.height = h + 'px';
 
-      // Visual Text Layer uses CSS dimensions
       textLayerDiv.style.width = w + 'px';
       textLayerDiv.style.height = h + 'px';
       textLayerDiv.style.setProperty('--scale-factor', scale);
 
-      // Canvas internal resolution scales by DPR
       pdfCanvas.width = w * dpr;
       pdfCanvas.height = h * dpr;
       pdfCanvas.style.width = w + 'px';
@@ -531,7 +536,6 @@
       drawCanvas.style.width = w + 'px';
       drawCanvas.style.height = h + 'px';
 
-      // Reset transforms and scale drawing context
       drawCtx.setTransform(1, 0, 0, 1, 0, 0);
       drawCtx.scale(dpr, dpr);
     }
@@ -553,10 +557,16 @@
 
     function applyStrokeStyle() {
       drawCtx.globalAlpha = 1;
-      drawCtx.globalCompositeOperation = 'source-over';
+      
+      // The magic of erasing: "destination-out" acts exactly like an eraser, turning 
+      // whatever it touches totally transparent and revealing the PDF underneath.
+      drawCtx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
+      
       drawCtx.strokeStyle = '#000000';
       drawCtx.fillStyle = '#000000';
-      drawCtx.lineWidth = penSize;
+      
+      // Make the eraser 3x thicker than the pen so it is actually useful
+      drawCtx.lineWidth = currentTool === 'eraser' ? (penSize * 3) : penSize;
       drawCtx.lineCap = 'round';
       drawCtx.lineJoin = 'round';
     }
@@ -564,19 +574,19 @@
     function drawPoint(p) {
       applyStrokeStyle();
       drawCtx.beginPath();
-      drawCtx.arc(p.x, p.y, penSize / 2, 0, Math.PI * 2);
+      const radius = currentTool === 'eraser' ? (penSize * 1.5) : (penSize / 2);
+      drawCtx.arc(p.x, p.y, radius, 0, Math.PI * 2);
       drawCtx.fill();
     }
 
-        function startDrawing(e) {
+    function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
-
+      
       if (activePointerId !== null && activePointerId !== e.pointerId) {
         isDrawing = false;
       }
       
       e.preventDefault();
-      
       drawCanvas.setPointerCapture(e.pointerId);
       
       activePointerId = e.pointerId;
@@ -584,7 +594,6 @@
       lastPoint = getPos(e);
       drawPoint(lastPoint);
     }
-
 
     function draw(e) {
       if (!isDrawing) return;
@@ -620,8 +629,6 @@
         }, 500); 
       }
     }
-
-
 
     drawCanvas.addEventListener('pointerdown', startDrawing);
     drawCanvas.addEventListener('pointermove', draw);
@@ -745,7 +752,6 @@
 
     function saveCurrentPageAnnotation() {
       if (!pdfDoc || !currentPdfId) return Promise.resolve();
-      
       const pageToSave = currentPageNum;
       
       return new Promise(resolve => {
@@ -766,7 +772,6 @@
 
     async function renderPage(num) {
       if (!pdfDoc || num < 1 || num > totalPages) return;
-      
       await saveCurrentPageAnnotation();
 
       const page = await pdfDoc.getPage(num);
@@ -781,10 +786,8 @@
         transform: [dpr, 0, 0, dpr, 0, 0]
       };
       
-      // 1. Render the visual PDF content
       await page.render(renderContext).promise;
 
-      // 2. Render the invisible Text Layer
       textLayerDiv.innerHTML = '';
       const textContent = await page.getTextContent();
       await pdfjsLib.renderTextLayer({
@@ -797,7 +800,6 @@
       currentPageNum = num;
       drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
 
-      // 3. Load your saved drawings
       let saved = pageAnnotations[num];
       if (saved === undefined) {
         const rec = await idbGet('annotations', currentPdfId + '_' + num);
@@ -818,7 +820,14 @@
         const objectUrl = isBlob ? URL.createObjectURL(saved) : saved;
         
         img.onload = () => {
+           // We must draw the saved strokes BEFORE we start drawing new ones.
+           // Since the eraser modifies globalCompositeOperation, we temporarily reset it
+           // just to load the saved image smoothly.
+           const oldOp = drawCtx.globalCompositeOperation;
+           drawCtx.globalCompositeOperation = 'source-over';
            drawCtx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+           drawCtx.globalCompositeOperation = oldOp;
+           
            if (isBlob) URL.revokeObjectURL(objectUrl); 
         };
         img.src = objectUrl;
@@ -837,37 +846,43 @@
       document.getElementById('btn-next-page').disabled = currentPageNum >= totalPages;
     }
 
+    // --- REBUILT SYNC EXPORT ENGINE ---
     function downloadPage() {
       try {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = drawCanvas.width;
         tempCanvas.height = drawCanvas.height;
         const ctx = tempCanvas.getContext('2d');
+        
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
         ctx.drawImage(pdfCanvas, 0, 0);
         ctx.drawImage(drawCanvas, 0, 0);
 
-        tempCanvas.toBlob(async (blob) => {
-          if (!blob) {
-            document.getElementById('status-text').innerText = "EXPORT FAILED";
-            alert('Export failed: could not generate image.');
-            return;
-          }
+        // Convert synchronously so iOS Safari doesn't forget the user tapped the button.
+        const dataUrl = tempCanvas.toDataURL('image/png');
+        const byteString = atob(dataUrl.split(',')[1]);
+        const arrayBuffer = new ArrayBuffer(byteString.length);
+        const int8Array = new Uint8Array(arrayBuffer);
+        
+        for (let i = 0; i < byteString.length; i++) {
+          int8Array[i] = byteString.charCodeAt(i);
+        }
+        
+        const blob = new Blob([int8Array], { type: 'image/png' });
+        const fileName = 'annotated-doc-page' + currentPageNum + '.png';
+        const file = new File([blob], fileName, { type: 'image/png' });
 
-          const fileName = 'annotated-doc-page' + currentPageNum + '.png';
-          const file = new File([blob], fileName, { type: 'image/png' });
-
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
-              await navigator.share({ files: [file], title: fileName });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: fileName })
+            .then(() => {
               document.getElementById('status-text').innerText = "EXPORTED // " + fileName;
-            } catch (shareErr) {
-              console.log('Share cancelled/failed:', shareErr);
-            }
-            return;
-          }
-
+            })
+            .catch((shareErr) => {
+              console.log('Share cancelled:', shareErr);
+            });
+        } else {
+          // Fallback for desktop browsers
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -877,7 +892,7 @@
           a.click();
           setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
           document.getElementById('status-text').innerText = "EXPORTED // " + fileName;
-        }, 'image/png');
+        }
       } catch (err) {
         console.error('Export failed:', err);
         document.getElementById('status-text').innerText = "EXPORT FAILED";
