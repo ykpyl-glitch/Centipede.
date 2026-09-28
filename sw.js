@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css",
   "https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap"
+  ⁠"[https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js](https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js)"⁠
 ];
 
 
