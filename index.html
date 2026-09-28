@@ -235,14 +235,14 @@
     canvas, .textLayer { position: absolute; top: 0; left: 0; }
     #pdf-canvas { z-index: 1; touch-action: none; }
     .textLayer { z-index: 2; opacity: 0.5; } 
-        #draw-canvas { 
+    
+    #draw-canvas { 
       z-index: 3; 
       touch-action: none; 
       cursor: crosshair; 
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
     }
-
 
     #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
     #canvas-container.mode-select #draw-canvas { pointer-events: none; }
@@ -385,7 +385,7 @@
     let penSize = 3;
     let isDrawing = false;
     let lastPoint = null;
-    let activePointerId = null;
+    let activePenId = null;
     let allowFingerDrawing = false; 
     let interactionMode = 'draw'; 
 
@@ -589,10 +589,7 @@
     function shouldAcceptPointer(e) {
       if (interactionMode !== 'draw') return false; 
       if (e.pointerType === 'pen') return true;
-      if (allowFingerDrawing) {
-        if (e.pointerType === 'touch' && !e.isPrimary) return false;
-        return true;
-      }
+      if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary) return true;
       return false;
     }
 
@@ -633,16 +630,6 @@
       drawCtx.fill();
     }
 
-        // Tracks active pen pointer strictly, ignoring touch cancellations
-    let activePenId = null;
-
-    function shouldAcceptPointer(e) {
-      if (interactionMode !== 'draw') return false; 
-      if (e.pointerType === 'pen') return true;
-      if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary) return true;
-      return false;
-    }
-
     function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
       e.preventDefault();
@@ -650,8 +637,7 @@
       activePenId = e.pointerId;
       isDrawing = true;
       lastPoint = getPos(e);
-      
-      // Draw point immediately
+
       drawPoint(lastPoint);
     }
 
@@ -659,7 +645,6 @@
       if (!isDrawing || e.pointerId !== activePenId) return;
       e.preventDefault();
 
-      // Process coalesced events to catch high-frequency 120Hz pen data
       const events = (typeof e.getCoalescedEvents === 'function') 
         ? e.getCoalescedEvents() 
         : [e];
@@ -680,30 +665,18 @@
     function stopDrawing(e) {
       if (e.pointerId !== activePenId) return;
       e.preventDefault();
-      
+
       isDrawing = false;
       lastPoint = null;
       activePenId = null;
     }
 
-    function cancelDrawing(e) {
-      // ONLY cancel if it is actually the pen being canceled, not your resting palm
-      if (e.pointerId === activePenId) {
-        isDrawing = false;
-        lastPoint = null;
-        activePenId = null;
-      }
-    }
-
-    // Attach listeners directly to drawCanvas with passive: false
     drawCanvas.addEventListener('pointerdown', startDrawing, { passive: false });
     drawCanvas.addEventListener('pointermove', draw, { passive: false });
     drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
-    drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
-    drawCanvas.addEventListener('pointerout', stopDrawing, { passive: false });
+    drawCanvas.addEventListener('pointercancel', stopDrawing, { passive: false });
+    drawCanvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 
-
-    // Global save trigger when app is minimized or put to sleep
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentPdfId) {
         saveCurrentPageAnnotation();
@@ -919,9 +892,7 @@
            const oldAlpha = drawCtx.globalAlpha;
            
            drawCtx.globalCompositeOperation = 'source-over';
-           drawCtx.globalAlpha = 1;
            drawCtx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
-           
            drawCtx.globalCompositeOperation = oldOp;
            drawCtx.globalAlpha = oldAlpha;
            
