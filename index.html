@@ -381,11 +381,12 @@
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+    // State
     let currentTool = 'pen'; 
     let penSize = 3;
     let isDrawing = false;
-    let lastPoint = null;
     let activePenId = null;
+    let strokePoints = []; 
     let allowFingerDrawing = false; 
     let interactionMode = 'draw'; 
 
@@ -586,13 +587,6 @@
       return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
 
-    function shouldAcceptPointer(e) {
-      if (interactionMode !== 'draw') return false; 
-      if (e.pointerType === 'pen') return true;
-      if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary) return true;
-      return false;
-    }
-
     function applyStrokeStyle() {
       if (currentTool === 'eraser') {
         drawCtx.globalAlpha = 1;
@@ -630,10 +624,7 @@
       drawCtx.fill();
     }
 
-        // --- PEN TRACKING & SMOOTHING ---
-    let activePenId = null;
-    let strokePoints = []; // Replaces lastPoint to track the curve history
-
+    // --- PEN TRACKING & BEZIER SMOOTHING ---
     function shouldAcceptPointer(e) {
       if (interactionMode !== 'draw') return false; 
       if (e.pointerType === 'pen') return true;
@@ -656,7 +647,7 @@
       isDrawing = true;
       
       const startPt = getPos(e);
-      strokePoints = [startPt]; // Start a brand new stroke array
+      strokePoints = [startPt]; 
       
       try { drawCanvas.setPointerCapture(activePenId); } catch (err) {}
       
@@ -683,15 +674,15 @@
           const p1 = strokePoints[strokePoints.length - 2];
           const p2 = strokePoints[strokePoints.length - 1];
           
-          // Calculate the midpoints to round off sharp jitters
           const mid1 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
           const mid2 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
           
+          drawCtx.beginPath();
           drawCtx.moveTo(mid1.x, mid1.y);
           drawCtx.quadraticCurveTo(p1.x, p1.y, mid2.x, mid2.y);
           drawCtx.stroke();
         } else if (strokePoints.length === 2) {
-          // Connect the initial start point smoothly
+          drawCtx.beginPath();
           drawCtx.moveTo(strokePoints[0].x, strokePoints[0].y);
           drawCtx.lineTo(strokePoints[1].x, strokePoints[1].y);
           drawCtx.stroke();
@@ -699,22 +690,35 @@
       }
     }
 
-
     function stopDrawing(e) {
       if (e.pointerId !== activePenId) return;
       e.preventDefault();
+      e.stopPropagation();
 
       isDrawing = false;
-      lastPoint = null;
       activePenId = null;
+      strokePoints = [];
     }
 
+    function cancelDrawing(e) {
+      if (e.pointerId !== activePenId) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      isDrawing = false;
+      activePenId = null;
+      strokePoints = [];
+    }
+
+    // Attach listeners with passive: false to allow gesture blocking
     drawCanvas.addEventListener('pointerdown', startDrawing, { passive: false });
     drawCanvas.addEventListener('pointermove', draw, { passive: false });
     drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
-    drawCanvas.addEventListener('pointercancel', stopDrawing, { passive: false });
+    drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
+    drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
     drawCanvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 
+    // Global save when app minimizes
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentPdfId) {
         saveCurrentPageAnnotation();
