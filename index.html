@@ -25,7 +25,6 @@
       --disabled-grey: #444449;
     }
 
-    /* FIX 1: Complete global lobotomy of iOS Safari Gestures */
     * { 
       box-sizing: border-box; 
       margin: 0; 
@@ -41,8 +40,8 @@
       font-family: 'Share Tech Mono', monospace;
       height: 100%;
       overflow: hidden;
-      touch-action: none; /* Kills pinch/zoom globally */
-      overscroll-behavior: none; /* Kills swipe-to-back globally */
+      touch-action: none;
+      overscroll-behavior: none;
     }
 
     body { display: flex; flex-direction: column; }
@@ -191,6 +190,7 @@
     .btn:disabled { background: var(--panel); border-color: var(--disabled-grey); color: var(--disabled-grey); cursor: not-allowed; opacity: 0.6; }
 
     #view-viewer { flex-direction: column; }
+    
     .viewer-toolbar { gap: 6px; }
 
     .size-control {
@@ -239,8 +239,17 @@
 
     #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
     #canvas-container.mode-select #draw-canvas { pointer-events: none; }
-    #canvas-container.mode-select .textLayer { pointer-events: auto; user-select: none; -webkit-user-select: none; }
-    #canvas-container.mode-select .textLayer span { user-select: text; -webkit-user-select: text; cursor: text; }
+    
+    #canvas-container.mode-select .textLayer { 
+      pointer-events: auto; 
+      user-select: none; 
+      -webkit-user-select: none; 
+    }
+    #canvas-container.mode-select .textLayer span { 
+      user-select: text; 
+      -webkit-user-select: text; 
+      cursor: text; 
+    }
 
     .page-arrow {
       position: absolute;
@@ -618,15 +627,16 @@
     }
 
     function startDrawing(e) {
-      // FIX: Aggressive block of all iOS Safari gestures (swipes, long presses, zooms) 
-      // preventing them from stealing the CPU when a palm is on the screen.
       e.preventDefault();
       e.stopPropagation();
 
       if (!shouldAcceptPointer(e)) return;
       
-      // FIX: Instantly override any previous stuck ghost strokes. 
-      // If the Apple Pencil touches the glass, it ruthlessly takes over.
+      if (activePointerId !== null && activePointerId !== e.pointerId) {
+        isDrawing = false;
+        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
+      }
+      
       activePointerId = e.pointerId;
       isDrawing = true;
       lastPoint = getPos(e);
@@ -667,15 +677,12 @@
         try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
         activePointerId = null;
       }
-      
-      // FIX: ZERO-LAG SAVING.
-      // Auto-save no longer triggers here during active writing.
-      // It ONLY saves when you turn the page, export, or minimize the app,
-      // completely eliminating mid-stroke freezing.
     }
 
-    // Additional safeguard: If Safari forces a pointercancel, instantly drop the lock.
     function cancelDrawing(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      
       isDrawing = false;
       lastPoint = null;
       if (activePointerId !== null) {
@@ -684,13 +691,14 @@
       }
     }
 
+    // Modern Safari requires { passive: false } to allow preventDefault to block native gestures
     drawCanvas.addEventListener('pointerdown', startDrawing, { passive: false });
     drawCanvas.addEventListener('pointermove', draw, { passive: false });
     drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
     drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
     drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
 
-    // FIX: Auto-save when iPad is minimized or user switches to another app
+    // Global save trigger when app is minimized or put to sleep
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentPdfId) {
         saveCurrentPageAnnotation();
