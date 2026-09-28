@@ -630,37 +630,75 @@
       drawCtx.fill();
     }
 
+        // --- PEN TRACKING & SMOOTHING ---
+    let activePenId = null;
+    let strokePoints = []; // Replaces lastPoint to track the curve history
+
+    function shouldAcceptPointer(e) {
+      if (interactionMode !== 'draw') return false; 
+      if (e.pointerType === 'pen') return true;
+      if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary) return true;
+      return false;
+    }
+
     function startDrawing(e) {
-      if (!shouldAcceptPointer(e)) return;
       e.preventDefault();
+      e.stopPropagation();
+
+      if (!shouldAcceptPointer(e)) return;
+      
+      if (activePenId !== null && activePenId !== e.pointerId) {
+        isDrawing = false;
+        try { drawCanvas.releasePointerCapture(activePenId); } catch (err) {}
+      }
       
       activePenId = e.pointerId;
       isDrawing = true;
-      lastPoint = getPos(e);
-
-      drawPoint(lastPoint);
+      
+      const startPt = getPos(e);
+      strokePoints = [startPt]; // Start a brand new stroke array
+      
+      try { drawCanvas.setPointerCapture(activePenId); } catch (err) {}
+      
+      drawPoint(startPt);
     }
 
     function draw(e) {
-      if (!isDrawing || e.pointerId !== activePenId) return;
       e.preventDefault();
-
+      e.stopPropagation();
+      
+      if (!isDrawing || e.pointerId !== activePenId) return;
+      
       const events = (typeof e.getCoalescedEvents === 'function') 
         ? e.getCoalescedEvents() 
         : [e];
 
       for (let i = 0; i < events.length; i++) {
         const pt = getPos(events[i]);
-        if (lastPoint) {
-          applyStrokeStyle();
-          drawCtx.beginPath();
-          drawCtx.moveTo(lastPoint.x, lastPoint.y);
-          drawCtx.lineTo(pt.x, pt.y);
+        strokePoints.push(pt);
+        
+        applyStrokeStyle();
+        if (strokePoints.length >= 3) {
+          const p0 = strokePoints[strokePoints.length - 3];
+          const p1 = strokePoints[strokePoints.length - 2];
+          const p2 = strokePoints[strokePoints.length - 1];
+          
+          // Calculate the midpoints to round off sharp jitters
+          const mid1 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+          const mid2 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+          
+          drawCtx.moveTo(mid1.x, mid1.y);
+          drawCtx.quadraticCurveTo(p1.x, p1.y, mid2.x, mid2.y);
+          drawCtx.stroke();
+        } else if (strokePoints.length === 2) {
+          // Connect the initial start point smoothly
+          drawCtx.moveTo(strokePoints[0].x, strokePoints[0].y);
+          drawCtx.lineTo(strokePoints[1].x, strokePoints[1].y);
           drawCtx.stroke();
         }
-        lastPoint = pt;
       }
     }
+
 
     function stopDrawing(e) {
       if (e.pointerId !== activePenId) return;
