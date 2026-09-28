@@ -202,13 +202,16 @@
       overflow: auto;
     }
 
-    #canvas-container {
+       #canvas-container {
       position: relative;
       background: #ffffff;
-      box-shadow: 0 0 16px rgba(0, 0, 0, 0.5);
       margin: auto;
       transform-origin: top left;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
     }
+
 
     /* Z-INDEX STACKING */
     canvas, .textLayer { position: absolute; top: 0; left: 0; }
