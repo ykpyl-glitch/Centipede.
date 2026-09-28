@@ -626,77 +626,75 @@
       drawCtx.fill();
     }
 
-    function startDrawing(e) {
-      e.preventDefault();
-      e.stopPropagation();
+        // Tracks active pen pointer strictly, ignoring touch cancellations
+    let activePenId = null;
 
+    function shouldAcceptPointer(e) {
+      if (interactionMode !== 'draw') return false; 
+      if (e.pointerType === 'pen') return true;
+      if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary) return true;
+      return false;
+    }
+
+    function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
+      e.preventDefault();
       
-      if (activePointerId !== null && activePointerId !== e.pointerId) {
-        isDrawing = false;
-        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
-      }
-      
-      activePointerId = e.pointerId;
+      activePenId = e.pointerId;
       isDrawing = true;
       lastPoint = getPos(e);
       
-      try { drawCanvas.setPointerCapture(activePointerId); } catch (err) {}
-      
+      // Draw point immediately
       drawPoint(lastPoint);
     }
 
     function draw(e) {
+      if (!isDrawing || e.pointerId !== activePenId) return;
       e.preventDefault();
-      e.stopPropagation();
-      
-      if (!isDrawing) return;
-      if (e.pointerId !== activePointerId) return;
-      
-      const currentPoint = getPos(e);
-      if (lastPoint) {
-        applyStrokeStyle();
-        drawCtx.beginPath();
-        drawCtx.moveTo(lastPoint.x, lastPoint.y);
-        drawCtx.lineTo(currentPoint.x, currentPoint.y);
-        drawCtx.stroke();
+
+      // Process coalesced events to catch high-frequency 120Hz pen data
+      const events = (typeof e.getCoalescedEvents === 'function') 
+        ? e.getCoalescedEvents() 
+        : [e];
+
+      for (let i = 0; i < events.length; i++) {
+        const pt = getPos(events[i]);
+        if (lastPoint) {
+          applyStrokeStyle();
+          drawCtx.beginPath();
+          drawCtx.moveTo(lastPoint.x, lastPoint.y);
+          drawCtx.lineTo(pt.x, pt.y);
+          drawCtx.stroke();
+        }
+        lastPoint = pt;
       }
-      lastPoint = currentPoint;
     }
 
     function stopDrawing(e) {
+      if (e.pointerId !== activePenId) return;
       e.preventDefault();
-      e.stopPropagation();
-
-      if (e && e.pointerId !== undefined && e.pointerId !== activePointerId) return;
-
+      
       isDrawing = false;
       lastPoint = null;
-      
-      if (activePointerId !== null) {
-        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
-        activePointerId = null;
-      }
+      activePenId = null;
     }
 
     function cancelDrawing(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      isDrawing = false;
-      lastPoint = null;
-      if (activePointerId !== null) {
-        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
-        activePointerId = null;
+      // ONLY cancel if it is actually the pen being canceled, not your resting palm
+      if (e.pointerId === activePenId) {
+        isDrawing = false;
+        lastPoint = null;
+        activePenId = null;
       }
     }
 
-    // Modern Safari requires { passive: false } to allow preventDefault to block native gestures
+    // Attach listeners directly to drawCanvas with passive: false
     drawCanvas.addEventListener('pointerdown', startDrawing, { passive: false });
     drawCanvas.addEventListener('pointermove', draw, { passive: false });
     drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
     drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
-    drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
+    drawCanvas.addEventListener('pointerout', stopDrawing, { passive: false });
+
 
     // Global save trigger when app is minimized or put to sleep
     document.addEventListener('visibilitychange', () => {
