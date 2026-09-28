@@ -961,7 +961,7 @@
       document.getElementById('btn-prev-page').disabled = currentPageNum <= 1;
       document.getElementById('btn-next-page').disabled = currentPageNum >= totalPages;
     }
-        async function exportFullPdf() {
+    async function exportFullPdf() {
       try {
         if (!currentPdfId) return;
         
@@ -969,9 +969,11 @@
         await saveCurrentPageAnnotation();
         const record = await idbGet('pdfData', currentPdfId);
         if (!record || !record.data) throw new Error("Could not load original PDF data.");
+        
         const { PDFDocument } = PDFLib;
         const pdf = await PDFDocument.load(record.data);
         const pages = pdf.getPages();
+        
         for (let i = 0; i < pages.length; i++) {
           const pageNum = i + 1;
           let annotationData = pageAnnotations[pageNum];
@@ -985,7 +987,6 @@
             if (annotationData instanceof Blob) {
               pngImageBytes = await annotationData.arrayBuffer();
             } else if (typeof annotationData === 'string' && annotationData.startsWith('data:image/png;base64,')) {
-               // Fallback for older base64 saves
                const b64 = annotationData.split(',')[1];
                const binStr = atob(b64);
                const arr = new Uint8Array(binStr.length);
@@ -998,7 +999,6 @@
                const page = pages[i];
                const { width, height } = page.getSize();
                
-               // Draw the transparent layer perfectly stretched over the page
                page.drawImage(pngImage, {
                  x: 0,
                  y: 0,
@@ -1008,11 +1008,12 @@
             }
           }
         }
+        
         const pdfBytes = await pdf.save();
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
         const fileName = (currentPdfName.replace('.pdf', '') || 'Document') + '_Annotated.pdf';
         const file = new File([blob], fileName, { type: 'application/pdf' });
-        )
+        
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], title: fileName });
           document.getElementById('status-text').innerText = "EXPORTED // " + fileName;
@@ -1033,6 +1034,7 @@
         alert('Export failed: ' + err.message);
       }
     }
+
 
 
     
