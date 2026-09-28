@@ -25,7 +25,7 @@
       --disabled-grey: #444449;
     }
 
-    /* Strict iOS text selection reset */
+    /* FIX 1: Complete global lobotomy of iOS Safari Gestures */
     * { 
       box-sizing: border-box; 
       margin: 0; 
@@ -41,6 +41,8 @@
       font-family: 'Share Tech Mono', monospace;
       height: 100%;
       overflow: hidden;
+      touch-action: none; /* Kills pinch/zoom globally */
+      overscroll-behavior: none; /* Kills swipe-to-back globally */
     }
 
     body { display: flex; flex-direction: column; }
@@ -77,7 +79,6 @@
       position: relative;
     }
 
-    /* -- VIEW TRANSITIONS -- */
     @keyframes viewFadeIn {
       from { opacity: 0; transform: scale(0.98) translateY(10px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
@@ -96,7 +97,6 @@
       animation: viewFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
     }
 
-    /* ---------- MAIN MENU VIEW ---------- */
     #view-menu { padding: 20px; overflow-y: auto; }
 
     .menu-title {
@@ -110,7 +110,6 @@
 
     .menu-actions { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
     
-    /* -- FOLDER ANIMATIONS -- */
     .folder-tree { display: flex; flex-direction: column; gap: 6px; max-width: 700px; }
     
     .folder-item { 
@@ -142,7 +141,6 @@
       font-size: 13px;
     }
 
-    /* -- PDF ITEM HOVER PHYSICS -- */
     .pdf-list { margin-top: 10px; padding-left: 8px; display: flex; flex-direction: column; gap: 8px; }
     
     .pdf-item {
@@ -169,7 +167,6 @@
     
     .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; opacity: 0.7; }
 
-    /* ---------- BUTTONS ---------- */
     .btn {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -188,27 +185,12 @@
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .btn:hover { 
-      background: var(--accent-dim); 
-      transform: translateY(-1px);
-    }
-    
-    .btn:active {
-      transform: translateY(1px);
-    }
-    
-    .btn.active { 
-      background: var(--text-bright); 
-      color: #000; 
-      border-color: var(--text-bright); 
-      font-weight: bold;
-    }
-    
+    .btn:hover { background: var(--accent-dim); transform: translateY(-1px); }
+    .btn:active { transform: translateY(1px); }
+    .btn.active { background: var(--text-bright); color: #000; border-color: var(--text-bright); font-weight: bold; }
     .btn:disabled { background: var(--panel); border-color: var(--disabled-grey); color: var(--disabled-grey); cursor: not-allowed; opacity: 0.6; }
 
-    /* ---------- VIEWER ---------- */
     #view-viewer { flex-direction: column; }
-    
     .viewer-toolbar { gap: 6px; }
 
     .size-control {
@@ -223,34 +205,11 @@
       color: var(--text-dim);
     }
     
-    /* Custom Range Slider */
-    input[type=range] {
-      -webkit-appearance: none;
-      background: transparent;
-      width: 80px;
-    }
+    input[type=range] { -webkit-appearance: none; background: transparent; width: 80px; }
     input[type=range]:focus { outline: none; }
-    input[type=range]::-webkit-slider-runnable-track {
-      width: 100%;
-      height: 4px;
-      cursor: pointer;
-      background: #2c2c33;
-      border-radius: 2px;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      height: 14px;
-      width: 14px;
-      border-radius: 50%;
-      background: var(--text-bright);
-      cursor: pointer;
-      -webkit-appearance: none;
-      margin-top: -5px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-      transition: transform 0.1s;
-    }
-    input[type=range]::-webkit-slider-thumb:active {
-      transform: scale(1.2); 
-    }
+    input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #2c2c33; border-radius: 2px; }
+    input[type=range]::-webkit-slider-thumb { height: 14px; width: 14px; border-radius: 50%; background: var(--text-bright); cursor: pointer; -webkit-appearance: none; margin-top: -5px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); transition: transform 0.1s; }
+    input[type=range]::-webkit-slider-thumb:active { transform: scale(1.2); }
     .size-control:has(input:disabled) { opacity: 0.5; }
 
     .workspace {
@@ -273,28 +232,16 @@
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
     }
 
-    /* Z-INDEX STACKING */
     canvas, .textLayer { position: absolute; top: 0; left: 0; }
     #pdf-canvas { z-index: 1; touch-action: none; }
     .textLayer { z-index: 2; opacity: 0.5; } 
     #draw-canvas { z-index: 3; touch-action: none; cursor: crosshair; }
 
-    /* MODE TOGGLES */
     #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
     #canvas-container.mode-select #draw-canvas { pointer-events: none; }
-    
-    #canvas-container.mode-select .textLayer { 
-      pointer-events: auto; 
-      user-select: none; 
-      -webkit-user-select: none; 
-    }
-    #canvas-container.mode-select .textLayer span { 
-      user-select: text; 
-      -webkit-user-select: text; 
-      cursor: text; 
-    }
+    #canvas-container.mode-select .textLayer { pointer-events: auto; user-select: none; -webkit-user-select: none; }
+    #canvas-container.mode-select .textLayer span { user-select: text; -webkit-user-select: text; cursor: text; }
 
-    /* Page Navigation */
     .page-arrow {
       position: absolute;
       top: 50%;
@@ -418,7 +365,6 @@
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // State
     let currentTool = 'pen'; 
     let penSize = 3;
     let isDrawing = false;
@@ -426,7 +372,6 @@
     let activePointerId = null;
     let allowFingerDrawing = false; 
     let interactionMode = 'draw'; 
-    let autoSaveTimeout = null;
 
     let folders = []; 
     let currentFolderId = null;
@@ -673,17 +618,15 @@
     }
 
     function startDrawing(e) {
-      // Aggressively prevent default iPadOS gestures
+      // FIX: Aggressive block of all iOS Safari gestures (swipes, long presses, zooms) 
+      // preventing them from stealing the CPU when a palm is on the screen.
       e.preventDefault();
+      e.stopPropagation();
 
       if (!shouldAcceptPointer(e)) return;
       
-      // Force-clear any stuck locks
-      if (activePointerId !== null && activePointerId !== e.pointerId) {
-        isDrawing = false;
-        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
-      }
-      
+      // FIX: Instantly override any previous stuck ghost strokes. 
+      // If the Apple Pencil touches the glass, it ruthlessly takes over.
       activePointerId = e.pointerId;
       isDrawing = true;
       lastPoint = getPos(e);
@@ -695,6 +638,7 @@
 
     function draw(e) {
       e.preventDefault();
+      e.stopPropagation();
       
       if (!isDrawing) return;
       if (e.pointerId !== activePointerId) return;
@@ -711,9 +655,11 @@
     }
 
     function stopDrawing(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
       if (e && e.pointerId !== undefined && e.pointerId !== activePointerId) return;
 
-      const wasDrawing = isDrawing;
       isDrawing = false;
       lastPoint = null;
       
@@ -722,19 +668,34 @@
         activePointerId = null;
       }
       
-      if (wasDrawing) {
-        if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
-        autoSaveTimeout = setTimeout(() => {
-          saveCurrentPageAnnotation();
-        }, 500); 
+      // FIX: ZERO-LAG SAVING.
+      // Auto-save no longer triggers here during active writing.
+      // It ONLY saves when you turn the page, export, or minimize the app,
+      // completely eliminating mid-stroke freezing.
+    }
+
+    // Additional safeguard: If Safari forces a pointercancel, instantly drop the lock.
+    function cancelDrawing(e) {
+      isDrawing = false;
+      lastPoint = null;
+      if (activePointerId !== null) {
+        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
+        activePointerId = null;
       }
     }
 
-    drawCanvas.addEventListener('pointerdown', startDrawing);
-    drawCanvas.addEventListener('pointermove', draw);
-    drawCanvas.addEventListener('pointerup', stopDrawing);
-    drawCanvas.addEventListener('pointercancel', stopDrawing);
-    drawCanvas.addEventListener('pointerleave', stopDrawing);
+    drawCanvas.addEventListener('pointerdown', startDrawing, { passive: false });
+    drawCanvas.addEventListener('pointermove', draw, { passive: false });
+    drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
+    drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
+    drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
+
+    // FIX: Auto-save when iPad is minimized or user switches to another app
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden' && currentPdfId) {
+        saveCurrentPageAnnotation();
+      }
+    });
 
     function clearCanvas() {
       const dpr = window.devicePixelRatio || 1;
