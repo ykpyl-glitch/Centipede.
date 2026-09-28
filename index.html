@@ -138,30 +138,27 @@
       align-items: center;
       gap: 6px;
       white-space: nowrap;
-      border-radius: 6px; /* Slightly rounder, modern feel */
+      border-radius: 6px;
       touch-action: manipulation;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); /* Smooth fading */
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .btn:hover { 
       background: var(--accent-dim); 
-      transform: translateY(-1px); /* Lifts up slightly on hover */
+      transform: translateY(-1px);
     }
     
     .btn:active {
-      transform: translateY(1px); /* Physically pushes down when tapped */
+      transform: translateY(1px);
     }
     
     .btn.active { 
-      background: var(--text-bright); /* High contrast for active tools */
+      background: var(--text-bright); 
       color: #000; 
       border-color: var(--text-bright); 
       font-weight: bold;
     }
-
-
-    .btn:hover { background: var(--accent-dim); }
-    .btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+    
     .btn:disabled { background: var(--panel); border-color: var(--disabled-grey); color: var(--disabled-grey); cursor: not-allowed; opacity: 0.6; }
 
     /* ---------- VIEWER ---------- */
@@ -202,7 +199,7 @@
       overflow: auto;
     }
 
-       #canvas-container {
+    #canvas-container {
       position: relative;
       background: #ffffff;
       margin: auto;
@@ -211,7 +208,6 @@
       overflow: hidden;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
     }
-
 
     /* Z-INDEX STACKING */
     canvas, .textLayer { position: absolute; top: 0; left: 0; }
@@ -329,7 +325,6 @@
         <button class="btn" onclick="clearCanvas()">CLEAR</button>
         <button class="btn" onclick="downloadPage()">EXPORT</button>
         
-        <!-- Toggle button pushed to the far right using margin-left: auto -->
         <button id="btn-mode-toggle" class="btn active" onclick="toggleInteractionMode()" style="margin-left: auto;">MODE: DRAW</button>
       </div>
 
@@ -514,7 +509,6 @@
       document.getElementById('btn-highlighter').classList.toggle('active', toolName === 'highlighter');
       document.getElementById('btn-eraser').classList.toggle('active', toolName === 'eraser');
       
-      // Auto-switch to DRAW mode if user taps a tool while in SELECT mode
       if (interactionMode === 'select') {
          toggleInteractionMode();
       }
@@ -581,17 +575,16 @@
       if (currentTool === 'eraser') {
         drawCtx.globalAlpha = 1;
         drawCtx.globalCompositeOperation = 'destination-out';
-        drawCtx.strokeStyle = '#000000'; // Color doesn't matter for erase
+        drawCtx.strokeStyle = '#000000'; 
         drawCtx.fillStyle = '#000000';
         drawCtx.lineWidth = penSize * 3;
       } else if (currentTool === 'highlighter') {
         drawCtx.globalAlpha = 0.4;
         drawCtx.globalCompositeOperation = 'source-over';
-        drawCtx.strokeStyle = '#ffea00'; // Bright yellow
+        drawCtx.strokeStyle = '#ffea00'; 
         drawCtx.fillStyle = '#ffea00';
         drawCtx.lineWidth = penSize * 4;
       } else {
-        // Standard Pen
         drawCtx.globalAlpha = 1;
         drawCtx.globalCompositeOperation = 'source-over';
         drawCtx.strokeStyle = '#000000';
@@ -719,7 +712,7 @@
       renderFolders();
     }
 
-        function renderFolders() {
+    function renderFolders() {
       const tree = document.getElementById('folder-tree');
       tree.innerHTML = '';
 
@@ -751,18 +744,34 @@
       });
     }
 
+    // FIX 2: Added try/catch and Uint8Array wrapper for robust file importing
     document.getElementById('pdf-input').addEventListener('change', async function (e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const arrayBuffer = await file.arrayBuffer();
-      const id = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-      const meta = { id, folderId: currentFolderId, name: file.name };
-      await idbPut('pdfMeta', meta);
-      await idbPut('pdfData', { id, data: arrayBuffer });
-      const folder = folders.find(f => f.id === currentFolderId) || folders[0];
-      folder.pdfs.push({ id, name: file.name });
-      openPdf(new Uint8Array(arrayBuffer), file.name, id);
-      e.target.value = '';
+      try {
+        document.getElementById('status-text').innerText = "IMPORTING PDF...";
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const safeData = new Uint8Array(arrayBuffer); // Prevents Safari DataCloneError
+        
+        const id = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        const meta = { id, folderId: currentFolderId, name: file.name };
+        
+        await idbPut('pdfMeta', meta);
+        await idbPut('pdfData', { id, data: safeData });
+        
+        const folder = folders.find(f => f.id === currentFolderId) || folders[0];
+        folder.pdfs.push({ id, name: file.name });
+        
+        renderFolders(); // Ensure it updates the DOM immediately
+        
+        openPdf(safeData, file.name, id);
+        e.target.value = '';
+      } catch (err) {
+        console.error(err);
+        alert("Error loading file: " + err.message);
+        document.getElementById('status-text').innerText = "IMPORT FAILED";
+      }
     });
 
     async function openPdfFromMemory(pdfId) {
@@ -782,7 +791,7 @@
         currentPdfName = name;
         currentPageNum = 1;
         pageAnnotations = {};
-        renderPage(1);
+        renderPage(1, true); // FIX 1: Passes 'true' to skip initial blank save
       }).catch(err => {
         document.getElementById('status-text').innerText = "ERROR LOADING PDF";
         console.error(err);
@@ -809,9 +818,14 @@
       });
     }
 
-    async function renderPage(num) {
+    // FIX 1: added isInitialLoad bypass flag
+    async function renderPage(num, isInitialLoad = false) {
       if (!pdfDoc || num < 1 || num > totalPages) return;
-      await saveCurrentPageAnnotation();
+      
+      // Prevents overwriting the database with an empty canvas before loading the page
+      if (!isInitialLoad) {
+        await saveCurrentPageAnnotation();
+      }
 
       const page = await pdfDoc.getPage(num);
       const viewport = page.getViewport({ scale: 1.5 });
@@ -878,8 +892,8 @@
       document.getElementById('status-text').innerText = "READY // " + currentPdfName;
     }
 
-    function nextPage() { if (pdfDoc && currentPageNum < totalPages) renderPage(currentPageNum + 1); }
-    function prevPage() { if (pdfDoc && currentPageNum > 1) renderPage(currentPageNum - 1); }
+    function nextPage() { if (pdfDoc && currentPageNum < totalPages) renderPage(currentPageNum + 1, false); }
+    function prevPage() { if (pdfDoc && currentPageNum > 1) renderPage(currentPageNum - 1, false); }
 
     function updatePageControls() {
       document.getElementById('page-info').innerText = `PAGE: ${currentPageNum} / ${totalPages}`;
@@ -943,3 +957,4 @@
   </script>
 </body>
 </html>
+
