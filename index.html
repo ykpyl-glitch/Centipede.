@@ -143,6 +143,7 @@
     .pdf-item:hover { background: var(--text-bright); color: #000; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1); }
     .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; opacity: 0.7; }
 
+    /* ---------- BUTTONS & TOOL GROUPS ---------- */
     .btn {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -167,6 +168,7 @@
     #view-viewer { flex-direction: column; }
     .viewer-toolbar { gap: 6px; }
 
+    /* ---------- POPOVER MENUS ---------- */
     .tool-wrapper { position: relative; display: inline-block; }
     
     .tool-popover {
@@ -245,24 +247,25 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      overflow: auto;
+      overflow: hidden; /* Pinch/Pan managed via matrix */
     }
 
     #canvas-container {
       position: relative;
       background: #ffffff;
       margin: auto;
-      transform-origin: top left;
+      transform-origin: center center; 
       border-radius: 6px;
       overflow: hidden;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+      transition: transform 0s linear; 
     }
 
     canvas, .textLayer { position: absolute; top: 0; left: 0; }
     #pdf-canvas { z-index: 1; touch-action: none; }
     .textLayer { z-index: 2; opacity: 0.5; } 
     
-    /* MULTIPLY BLEND MODE ONLY ON HIGHLIGHT CANVAS */
+    /* LAYER 1: MULTIPLY BLEND MODE ONLY ON HIGHLIGHT CANVAS */
     #highlight-canvas {
       z-index: 3;
       touch-action: none;
@@ -270,7 +273,7 @@
       mix-blend-mode: multiply;
     }
 
-    /* DRAW CANVAS IS COMPLETELY NORMAL (Allows white pen on dark PDFs) */
+    /* LAYER 2: DRAW CANVAS IS NORMAL (Allows white pen on dark PDFs) */
     #draw-canvas { 
       z-index: 4; 
       touch-action: none; 
@@ -315,11 +318,16 @@
       background: rgba(0,0,0,0.85);
       border: 1px solid var(--border);
       color: var(--text-dim);
-      padding: 4px 10px;
+      padding: 6px 12px;
       font-size: 11px;
-      border-radius: 3px;
+      border-radius: 4px;
       z-index: 10;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.1s ease;
+      font-family: inherit;
     }
+    .page-pill:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .page-pill:active { transform: translateX(-50%) scale(0.95); }
 
     .status-bar {
       background: #000;
@@ -418,7 +426,6 @@
         <button class="btn" onclick="clearCurrentPage()">CLEAR PAGE</button>
         <button class="btn" onclick="exportFullPdf()">EXPORT</button>
 
-        <!-- Right Side Cluster: UNDO & REDO immediately left of MODE -->
         <div style="margin-left: auto; display: flex; gap: 6px;">
           <button class="btn" onclick="undoCanvas()">↩ UNDO</button>
           <button class="btn" onclick="redoCanvas()">REDO ↪</button>
@@ -437,7 +444,7 @@
         </div>
         
         <button class="page-arrow right" id="btn-next-page" onclick="nextPage()">▶</button>
-        <div class="page-pill" id="page-info">PAGE: 0 / 0</div>
+        <button class="page-pill" id="page-info" onclick="resetView()">PAGE: 0 / 0</button>
       </div>
     </section>
   </main>
@@ -468,6 +475,16 @@
     };
     
     let activePopover = null;
+
+    // Zoom & Pan Variables
+    let currentScale = 1;
+    let currentPanX = 0;
+    let currentPanY = 0;
+    let isPinching = false;
+    let initDist = 0;
+    let initScale = 1;
+    let initPan = { x: 0, y: 0 };
+    let initCenter = { x: 0, y: 0 };
 
     // Undo / Redo Stacks (stores snapshots of BOTH canvases)
     let undoStack = [];
@@ -698,6 +715,78 @@
       }
     }
 
+    // --- ROBUST PINCH TO ZOOM & PAN ENGINE ---
+    function applyTransform() {
+      const container = document.getElementById('canvas-container');
+      container.style.transform = `translate3d(${currentPanX}px, ${currentPanY}px, 0) scale(${currentScale})`;
+    }
+
+    function resetView() {
+      currentScale = 1;
+      currentPanX = 0;
+      currentPanY = 0;
+      applyTransform();
+    }
+
+    const workspaceEl = document.querySelector('.workspace');
+
+    function handleTouchEnd(e) {
+      if (e.touches.length < 2) {
+        isPinching = false;
+      }
+    }
+
+    workspaceEl.addEventListener('touchstart', (e) => {
+      // Initiate pinch only if not actively drawing
+      if (e.touches.length >= 2 && !isDrawing) {
+        e.preventDefault();
+        isPinching = true;
+
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+
+        initDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        initCenter = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        };
+        initScale = currentScale;
+        initPan = { x: currentPanX, y: currentPanY };
+      }
+    }, { passive: false });
+
+    workspaceEl.addEventListener('touchmove', (e) => {
+      if (isPinching && e.touches.length >= 2) {
+        e.preventDefault();
+
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+
+        const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        const currentCenter = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        };
+
+        if (initDist === 0) return;
+
+        const scaleDiff = currentDist / initDist;
+        const newScale = Math.max(0.5, Math.min(initScale * scaleDiff, 6)); 
+
+        const dx = currentCenter.x - initCenter.x;
+        const dy = currentCenter.y - initCenter.y;
+
+        currentScale = newScale;
+        currentPanX = initPan.x + dx;
+        currentPanY = initPan.y + dy;
+
+        applyTransform();
+      }
+    }, { passive: false });
+
+    workspaceEl.addEventListener('touchend', handleTouchEnd, { passive: false });
+    workspaceEl.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
     function initCanvasSize(w, h, scale) {
       const container = document.getElementById('canvas-container');
       const dpr = window.devicePixelRatio || 1;
@@ -723,9 +812,13 @@
       highlightCtx.scale(dpr, dpr);
     }
 
+    // --- ACCURATE UN-SCALED COORDINATE MAPPING ---
     function getPos(e) {
       const rect = drawCanvas.getBoundingClientRect();
-      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      return { 
+        x: (e.clientX - rect.left) * (drawCanvas.offsetWidth / rect.width), 
+        y: (e.clientY - rect.top) * (drawCanvas.offsetHeight / rect.height) 
+      };
     }
 
     // --- DUAL-CANVAS UNDO / REDO ENGINE ---
@@ -781,7 +874,6 @@
 
     function applyStrokeStyle(ctx) {
       if (currentTool === 'eraser') {
-        // Eraser clears BOTH canvases simultaneously
         drawCtx.globalAlpha = 1;
         drawCtx.globalCompositeOperation = 'destination-out';
         drawCtx.strokeStyle = '#000'; 
@@ -838,18 +930,29 @@
 
     function shouldAcceptPointer(e) {
       if (interactionMode !== 'draw') return false; 
-      if (e.pointerType === 'pen') return true;
+      
+      // HIERARCHY RULE 1: Apple Pencil overrides all gestures.
+      if (e.pointerType === 'pen') return true; 
+      
+      // HIERARCHY RULE 2: Block finger drawing if user is currently zooming
+      if (isPinching) return false; 
+      
       if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary) return true;
       return false;
     }
 
     function startDrawing(e) {
+      if (!shouldAcceptPointer(e)) return;
+
       closePopovers();
       e.preventDefault();
       e.stopPropagation();
 
-      if (!shouldAcceptPointer(e)) return;
-      
+      // HIERARCHY RULE 3: If Pen strikes glass, forcefully abort any active pinch gesture
+      if (e.pointerType === 'pen') {
+        isPinching = false;
+      }
+
       if (activePenId !== null && activePenId !== e.pointerId) {
         isDrawing = false;
         try { drawCanvas.releasePointerCapture(activePenId); } catch (err) {}
@@ -869,10 +972,10 @@
     }
 
     function draw(e) {
+      if (!isDrawing || e.pointerId !== activePenId) return;
+      
       e.preventDefault();
       e.stopPropagation();
-      
-      if (!isDrawing || e.pointerId !== activePenId) return;
       
       const events = (typeof e.getCoalescedEvents === 'function') 
         ? e.getCoalescedEvents() 
@@ -936,7 +1039,6 @@
     drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
     drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
     drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
-    drawCanvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentPdfId) {
@@ -1075,7 +1177,6 @@
       const pageToSave = currentPageNum;
       
       return new Promise(resolve => {
-        // Save both layers side-by-side into IndexedDB
         drawCanvas.toBlob(drawBlob => {
           highlightCanvas.toBlob(async hlBlob => {
             const annotationObj = { draw: drawBlob, hl: hlBlob };
@@ -1099,6 +1200,7 @@
 
       undoStack = [];
       redoStack = [];
+      resetView(); 
 
       const page = await pdfDoc.getPage(num);
       const viewport = page.getViewport({ scale: 1.5 });
@@ -1135,7 +1237,6 @@
       }
       
       if (saved) {
-        // Compatibility handler for older single-blob saves vs new dual-layer saves
         if (saved instanceof Blob) {
           const img = new Image();
           const objectUrl = URL.createObjectURL(saved);
@@ -1205,7 +1306,6 @@
             const page = pages[i];
             const { width, height } = page.getSize();
 
-            // Layer 1: Embed Highlighter with Multiply Blend Mode
             if (annotationData.hl && annotationData.hl instanceof Blob) {
               const hlBytes = await annotationData.hl.arrayBuffer();
               const hlImage = await pdf.embedPng(hlBytes);
@@ -1215,7 +1315,6 @@
               });
             }
 
-            // Layer 2: Embed Pen/Draw Normally on Top (White and all colors preserved)
             const drawTarget = annotationData.draw || (annotationData instanceof Blob ? annotationData : null);
             if (drawTarget && drawTarget instanceof Blob) {
               const drawBytes = await drawTarget.arrayBuffer();
