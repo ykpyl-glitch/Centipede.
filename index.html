@@ -143,6 +143,7 @@
     .pdf-item:hover { background: var(--text-bright); color: #000; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1); }
     .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; opacity: 0.7; }
 
+    /* ---------- BUTTONS & TOOL GROUPS ---------- */
     .btn {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -167,6 +168,7 @@
     #view-viewer { flex-direction: column; }
     .viewer-toolbar { gap: 6px; }
 
+    /* ---------- POPOVER MENUS ---------- */
     .tool-wrapper { position: relative; display: inline-block; }
     
     .tool-popover {
@@ -215,22 +217,14 @@
     input[type="color"]::-webkit-color-swatch { border: 2px solid var(--border); border-radius: 50%; }
     
     .size-preview-container {
-      width: 44px; 
-      height: 44px; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center;
-      background: #2a2a30; 
+      width: 44px; height: 44px; 
+      display: flex; align-items: center; justify-content: center;
+      background: #ffffff; /* Reverted to white so black pen is visible */
       border-radius: 6px; 
       border: 1px solid var(--border);
-      overflow: hidden;
-      flex-shrink: 0;
+      overflow: hidden; /* Contains massive brush sizes from breaking the box */
     }
-    .size-preview-dot { 
-      border-radius: 50%; 
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.15); 
-      transition: width 0.05s ease, height 0.05s ease;
-    }
+    .size-preview-dot { border-radius: 50%; }
 
     input[type=range] { -webkit-appearance: none; background: transparent; flex: 1; }
     input[type=range]:focus { outline: none; }
@@ -245,37 +239,31 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      overflow: hidden; 
+      overflow: auto;
     }
 
     #canvas-container {
       position: relative;
       background: #ffffff;
       margin: auto;
-      transform-origin: center center; 
+      transform-origin: top left;
       border-radius: 6px;
       overflow: hidden;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
-      transition: transform 0s linear; 
     }
 
     canvas, .textLayer { position: absolute; top: 0; left: 0; }
     #pdf-canvas { z-index: 1; touch-action: none; }
     .textLayer { z-index: 2; opacity: 0.5; } 
     
-    #highlight-canvas {
-      z-index: 3;
-      touch-action: none;
-      pointer-events: none;
-      mix-blend-mode: multiply;
-    }
-
+    /* MULTIPLY BLEND MODE applied directly to the canvas HTML element. */
     #draw-canvas { 
-      z-index: 4; 
+      z-index: 3; 
       touch-action: none; 
       cursor: crosshair; 
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
+      mix-blend-mode: multiply; 
     }
 
     #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
@@ -314,16 +302,11 @@
       background: rgba(0,0,0,0.85);
       border: 1px solid var(--border);
       color: var(--text-dim);
-      padding: 6px 12px;
+      padding: 4px 10px;
       font-size: 11px;
-      border-radius: 4px;
+      border-radius: 3px;
       z-index: 10;
-      cursor: pointer;
-      transition: background 0.2s ease, transform 0.1s ease;
-      font-family: inherit;
     }
-    .page-pill:hover { background: rgba(255,255,255,0.1); color: #fff; }
-    .page-pill:active { transform: translateX(-50%) scale(0.95); }
 
     .status-bar {
       background: #000;
@@ -366,13 +349,13 @@
       <div class="viewer-toolbar">
         <button class="btn" onclick="showMenu()">☰ MENU</button>
         
+        <!-- Pen Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-pen" class="btn active" onclick="handleToolClick('pen')">PEN</button>
           <div id="popover-pen" class="tool-popover">
             <div class="popover-row">
               <div class="color-presets">
                 <div class="color-swatch" style="background:#000000;" onclick="updateToolSettings('pen', 'color', '#000000')"></div>
-                <div class="color-swatch" style="background:#ffffff;" onclick="updateToolSettings('pen', 'color', '#ffffff')"></div>
                 <div class="color-swatch" style="background:#ff0033;" onclick="updateToolSettings('pen', 'color', '#ff0033')"></div>
                 <div class="color-swatch" style="background:#2962ff;" onclick="updateToolSettings('pen', 'color', '#2962ff')"></div>
                 <div class="color-swatch" style="background:#00c853;" onclick="updateToolSettings('pen', 'color', '#00c853')"></div>
@@ -386,6 +369,7 @@
           </div>
         </div>
 
+        <!-- Highlighter Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-highlighter" class="btn" onclick="handleToolClick('highlighter')">HIGHLIGHT</button>
           <div id="popover-highlighter" class="tool-popover">
@@ -405,6 +389,7 @@
           </div>
         </div>
 
+        <!-- Eraser Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-eraser" class="btn" onclick="handleToolClick('eraser')">ERASE</button>
           <div id="popover-eraser" class="tool-popover">
@@ -416,9 +401,10 @@
         </div>
         
         <button id="btn-touch-toggle" class="btn" onclick="toggleFingerDrawing()">FINGER: OFF</button>
-        <button class="btn" onclick="clearCurrentPage()">CLEAR PAGE</button>
+        <button class="btn" onclick="clearCanvas()">CLEAR PAGE</button>
         <button class="btn" onclick="exportFullPdf()">EXPORT</button>
 
+        <!-- Right Side Cluster: UNDO & REDO immediately left of MODE -->
         <div style="margin-left: auto; display: flex; gap: 6px;">
           <button class="btn" onclick="undoCanvas()">↩ UNDO</button>
           <button class="btn" onclick="redoCanvas()">REDO ↪</button>
@@ -432,12 +418,11 @@
         <div id="canvas-container" class="mode-draw">
           <canvas id="pdf-canvas"></canvas>
           <div id="text-layer" class="textLayer"></div>
-          <canvas id="highlight-canvas"></canvas>
           <canvas id="draw-canvas"></canvas>
         </div>
         
         <button class="page-arrow right" id="btn-next-page" onclick="nextPage()">▶</button>
-        <button class="page-pill" id="page-info" onclick="resetView()">PAGE: 0 / 0</button>
+        <div class="page-pill" id="page-info">PAGE: 0 / 0</div>
       </div>
     </section>
   </main>
@@ -453,6 +438,7 @@
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+    // Core States
     let currentTool = 'pen'; 
     let isDrawing = false;
     let activePenId = null;
@@ -460,6 +446,7 @@
     let allowFingerDrawing = false; 
     let interactionMode = 'draw'; 
 
+    // Tool Settings State
     let toolSettings = {
       pen: { size: 3, color: '#000000' },
       highlighter: { size: 12, color: '#ffeb3b' },
@@ -468,15 +455,7 @@
     
     let activePopover = null;
 
-    let currentScale = 1;
-    let currentPanX = 0;
-    let currentPanY = 0;
-    let isPinching = false;
-    let initDist = 0;
-    let initScale = 1;
-    let initPan = { x: 0, y: 0 };
-    let initCenter = { x: 0, y: 0 };
-
+    // Undo / Redo Stacks
     let undoStack = [];
     let redoStack = [];
     const MAX_HISTORY = 20;
@@ -492,8 +471,6 @@
 
     const pdfCanvas = document.getElementById('pdf-canvas');
     const pdfCtx = pdfCanvas.getContext('2d', { alpha: false });
-    const highlightCanvas = document.getElementById('highlight-canvas');
-    const highlightCtx = highlightCanvas.getContext('2d');
     const drawCanvas = document.getElementById('draw-canvas');
     const drawCtx = drawCanvas.getContext('2d');
     const textLayerDiv = document.getElementById('text-layer');
@@ -593,6 +570,7 @@
       document.getElementById('status-text').innerText = "SYSTEM READY // LIBRARY LOADED";
     }
 
+    // --- UI MANAGER ---
     async function showMenu() {
       closePopovers();
       await saveCurrentPageAnnotation();
@@ -672,24 +650,21 @@
 
     function updatePreviews() {
       const penDot = document.getElementById('pen-preview-dot');
-      const visualPenSize = Math.min(toolSettings.pen.size, 38);
-      penDot.style.width = visualPenSize + 'px';
-      penDot.style.height = visualPenSize + 'px';
+      penDot.style.width = toolSettings.pen.size + 'px';
+      penDot.style.height = toolSettings.pen.size + 'px';
       penDot.style.backgroundColor = toolSettings.pen.color;
 
       const hlDot = document.getElementById('hl-preview-dot');
-      const visualHlSize = Math.min(toolSettings.highlighter.size, 38);
-      hlDot.style.width = visualHlSize + 'px';
-      hlDot.style.height = visualHlSize + 'px';
+      hlDot.style.width = toolSettings.highlighter.size + 'px';
+      hlDot.style.height = toolSettings.highlighter.size + 'px';
       hlDot.style.backgroundColor = toolSettings.highlighter.color;
-      hlDot.style.opacity = '0.75'; 
+      hlDot.style.opacity = 0.4; 
 
       const erDot = document.getElementById('eraser-preview-dot');
-      const visualEraserSize = Math.min(Math.round(toolSettings.eraser.size * (38 / 80) + 4), 38);
-      erDot.style.width = visualEraserSize + 'px';
-      erDot.style.height = visualEraserSize + 'px';
+      erDot.style.width = toolSettings.eraser.size + 'px';
+      erDot.style.height = toolSettings.eraser.size + 'px';
       erDot.style.backgroundColor = '#ffffff'; 
-      erDot.style.border = '1px solid rgba(0, 0, 0, 0.4)';
+      erDot.style.border = '1px solid #ccc'; // Adds a border so the white eraser dot is visible against the white background
     }
 
     function toggleFingerDrawing() {
@@ -704,79 +679,9 @@
       }
     }
 
-    function applyTransform() {
-      const container = document.getElementById('canvas-container');
-      container.style.transform = `translate3d(${currentPanX}px, ${currentPanY}px, 0) scale(${currentScale})`;
-    }
-
-    function resetView() {
-      currentScale = 1;
-      currentPanX = 0;
-      currentPanY = 0;
-      applyTransform();
-    }
-
-    const workspaceEl = document.querySelector('.workspace');
-
-    function handleTouchEnd(e) {
-      if (e.touches.length < 2) {
-        isPinching = false;
-      }
-    }
-
-    workspaceEl.addEventListener('touchstart', (e) => {
-      if (e.touches.length >= 2 && !isDrawing) {
-        e.preventDefault();
-        isPinching = true;
-
-        const t1 = e.touches[0];
-        const t2 = e.touches[1];
-
-        initDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-        initCenter = {
-          x: (t1.clientX + t2.clientX) / 2,
-          y: (t1.clientY + t2.clientY) / 2
-        };
-        initScale = currentScale;
-        initPan = { x: currentPanX, y: currentPanY };
-      }
-    }, { passive: false });
-
-    workspaceEl.addEventListener('touchmove', (e) => {
-      if (isPinching && e.touches.length >= 2) {
-        e.preventDefault();
-
-        const t1 = e.touches[0];
-        const t2 = e.touches[1];
-
-        const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-        const currentCenter = {
-          x: (t1.clientX + t2.clientX) / 2,
-          y: (t1.clientY + t2.clientY) / 2
-        };
-
-        if (initDist === 0) return;
-
-        const scaleDiff = currentDist / initDist;
-        const newScale = Math.max(0.5, Math.min(initScale * scaleDiff, 6)); 
-
-        const dx = currentCenter.x - initCenter.x;
-        const dy = currentCenter.y - initCenter.y;
-
-        currentScale = newScale;
-        currentPanX = initPan.x + dx;
-        currentPanY = initPan.y + dy;
-
-        applyTransform();
-      }
-    }, { passive: false });
-
-    workspaceEl.addEventListener('touchend', handleTouchEnd, { passive: false });
-    workspaceEl.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-
     function initCanvasSize(w, h, scale) {
       const container = document.getElementById('canvas-container');
-      const dpr = window.devicePixelRatio || 1; 
+      const dpr = window.devicePixelRatio || 1;
 
       container.style.width = w + 'px';
       container.style.height = h + 'px';
@@ -785,96 +690,72 @@
       textLayerDiv.style.height = h + 'px';
       textLayerDiv.style.setProperty('--scale-factor', scale);
 
-      [pdfCanvas, highlightCanvas, drawCanvas].forEach(c => {
-        c.width = w * dpr;
-        c.height = h * dpr;
-        c.style.width = w + 'px';
-        c.style.height = h + 'px';
-      });
+      pdfCanvas.width = w * dpr;
+      pdfCanvas.height = h * dpr;
+      pdfCanvas.style.width = w + 'px';
+      pdfCanvas.style.height = h + 'px';
+
+      drawCanvas.width = w * dpr;
+      drawCanvas.height = h * dpr;
+      drawCanvas.style.width = w + 'px';
+      drawCanvas.style.height = h + 'px';
 
       drawCtx.setTransform(1, 0, 0, 1, 0, 0);
       drawCtx.scale(dpr, dpr);
-
-      highlightCtx.setTransform(1, 0, 0, 1, 0, 0);
-      highlightCtx.scale(dpr, dpr);
     }
 
     function getPos(e) {
       const rect = drawCanvas.getBoundingClientRect();
-      return { 
-        x: (e.clientX - rect.left) * (drawCanvas.offsetWidth / rect.width), 
-        y: (e.clientY - rect.top) * (drawCanvas.offsetHeight / rect.height) 
-      };
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
 
+    // --- UNDO / REDO ENGINE ---
     function pushStateToHistory() {
       if (undoStack.length >= MAX_HISTORY) undoStack.shift();
-      undoStack.push({
-        draw: drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height),
-        hl: highlightCtx.getImageData(0, 0, highlightCanvas.width, highlightCanvas.height)
-      });
+      undoStack.push(drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height));
       redoStack = []; 
     }
 
     function undoCanvas() {
       closePopovers();
       if (undoStack.length === 0) return;
-      redoStack.push({
-        draw: drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height),
-        hl: highlightCtx.getImageData(0, 0, highlightCanvas.width, highlightCanvas.height)
-      });
+      redoStack.push(drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height));
       const state = undoStack.pop();
-      drawCtx.putImageData(state.draw, 0, 0);
-      highlightCtx.putImageData(state.hl, 0, 0);
+      drawCtx.putImageData(state, 0, 0);
       saveCurrentPageAnnotation();
     }
 
     function redoCanvas() {
       closePopovers();
       if (redoStack.length === 0) return;
-      undoStack.push({
-        draw: drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height),
-        hl: highlightCtx.getImageData(0, 0, highlightCanvas.width, highlightCanvas.height)
-      });
+      undoStack.push(drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height));
       const state = redoStack.pop();
-      drawCtx.putImageData(state.draw, 0, 0);
-      highlightCtx.putImageData(state.hl, 0, 0);
+      drawCtx.putImageData(state, 0, 0);
       saveCurrentPageAnnotation();
     }
 
-    function clearCurrentPage() {
+    function clearCanvas() {
       closePopovers();
       pushStateToHistory(); 
       const dpr = window.devicePixelRatio || 1;
       drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
-      highlightCtx.clearRect(0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
       saveCurrentPageAnnotation();
-      document.getElementById('status-text').innerText = `CLEARED // PAGE ${currentPageNum}`;
     }
 
-    function getActiveCtx() {
-      return (currentTool === 'highlighter') ? highlightCtx : drawCtx;
-    }
-
-    function applyStrokeStyle(ctx) {
+    // --- DRAWING ENGINE ---
+    function applyStrokeStyle() {
       if (currentTool === 'eraser') {
         drawCtx.globalAlpha = 1;
         drawCtx.globalCompositeOperation = 'destination-out';
         drawCtx.strokeStyle = '#000'; 
         drawCtx.fillStyle = '#000';
         drawCtx.lineWidth = toolSettings.eraser.size;
-
-        highlightCtx.globalAlpha = 1;
-        highlightCtx.globalCompositeOperation = 'destination-out';
-        highlightCtx.strokeStyle = '#000'; 
-        highlightCtx.fillStyle = '#000';
-        highlightCtx.lineWidth = toolSettings.eraser.size;
       } else if (currentTool === 'highlighter') {
-        highlightCtx.globalAlpha = 1; 
-        highlightCtx.globalCompositeOperation = 'source-over';
-        highlightCtx.strokeStyle = toolSettings.highlighter.color; 
-        highlightCtx.fillStyle = toolSettings.highlighter.color;
-        highlightCtx.lineWidth = toolSettings.highlighter.size;
+        drawCtx.globalAlpha = 1; 
+        drawCtx.globalCompositeOperation = 'source-over';
+        drawCtx.strokeStyle = toolSettings.highlighter.color; 
+        drawCtx.fillStyle = toolSettings.highlighter.color;
+        drawCtx.lineWidth = toolSettings.highlighter.size;
       } else {
         drawCtx.globalAlpha = 1;
         drawCtx.globalCompositeOperation = 'source-over';
@@ -885,52 +766,35 @@
       
       drawCtx.lineCap = 'round';
       drawCtx.lineJoin = 'round';
-      highlightCtx.lineCap = 'round';
-      highlightCtx.lineJoin = 'round';
     }
 
     function drawPoint(p) {
       applyStrokeStyle();
+      drawCtx.beginPath();
       
-      if (currentTool === 'eraser') {
-        const radius = toolSettings.eraser.size / 2;
-        [drawCtx, highlightCtx].forEach(ctx => {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
-          ctx.fill();
-        });
-        return;
-      }
-
-      const ctx = getActiveCtx();
-      let radius = (currentTool === 'highlighter') 
-        ? toolSettings.highlighter.size / 2 
-        : toolSettings.pen.size / 2;
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
-      ctx.fill();
+      let radius = 1;
+      if (currentTool === 'eraser') radius = toolSettings.eraser.size / 2;
+      else if (currentTool === 'highlighter') radius = toolSettings.highlighter.size / 2;
+      else radius = toolSettings.pen.size / 2;
+      
+      drawCtx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      drawCtx.fill();
     }
 
     function shouldAcceptPointer(e) {
       if (interactionMode !== 'draw') return false; 
-      if (e.pointerType === 'pen') return true; 
-      if (isPinching) return false; 
+      if (e.pointerType === 'pen') return true;
       if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary) return true;
       return false;
     }
 
     function startDrawing(e) {
       closePopovers();
-      if (!shouldAcceptPointer(e)) return;
-
       e.preventDefault();
       e.stopPropagation();
 
-      if (e.pointerType === 'pen') {
-        isPinching = false;
-      }
-
+      if (!shouldAcceptPointer(e)) return;
+      
       if (activePenId !== null && activePenId !== e.pointerId) {
         isDrawing = false;
         try { drawCanvas.releasePointerCapture(activePenId); } catch (err) {}
@@ -950,10 +814,10 @@
     }
 
     function draw(e) {
-      if (!isDrawing || e.pointerId !== activePenId) return;
-      
       e.preventDefault();
       e.stopPropagation();
+      
+      if (!isDrawing || e.pointerId !== activePenId) return;
       
       const events = (typeof e.getCoalescedEvents === 'function') 
         ? e.getCoalescedEvents() 
@@ -964,9 +828,6 @@
         strokePoints.push(pt);
         
         applyStrokeStyle();
-        
-        const targets = (currentTool === 'eraser') ? [drawCtx, highlightCtx] : [getActiveCtx()];
-        
         if (strokePoints.length >= 3) {
           const p0 = strokePoints[strokePoints.length - 3];
           const p1 = strokePoints[strokePoints.length - 2];
@@ -975,19 +836,15 @@
           const mid1 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
           const mid2 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
           
-          targets.forEach(ctx => {
-            ctx.beginPath();
-            ctx.moveTo(mid1.x, mid1.y);
-            ctx.quadraticCurveTo(p1.x, p1.y, mid2.x, mid2.y);
-            ctx.stroke();
-          });
+          drawCtx.beginPath();
+          drawCtx.moveTo(mid1.x, mid1.y);
+          drawCtx.quadraticCurveTo(p1.x, p1.y, mid2.x, mid2.y);
+          drawCtx.stroke();
         } else if (strokePoints.length === 2) {
-          targets.forEach(ctx => {
-            ctx.beginPath();
-            ctx.moveTo(strokePoints[0].x, strokePoints[0].y);
-            ctx.lineTo(strokePoints[1].x, strokePoints[1].y);
-            ctx.stroke();
-          });
+          drawCtx.beginPath();
+          drawCtx.moveTo(strokePoints[0].x, strokePoints[0].y);
+          drawCtx.lineTo(strokePoints[1].x, strokePoints[1].y);
+          drawCtx.stroke();
         }
       }
     }
@@ -996,6 +853,7 @@
       if (e.pointerId !== activePenId) return;
       e.preventDefault();
       e.stopPropagation();
+
       isDrawing = false;
       activePenId = null;
       strokePoints = [];
@@ -1005,6 +863,7 @@
       if (e.pointerId !== activePenId) return;
       e.preventDefault();
       e.stopPropagation();
+
       isDrawing = false;
       activePenId = null;
       strokePoints = [];
@@ -1015,6 +874,7 @@
     drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
     drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
     drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
+    drawCanvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentPdfId) {
@@ -1153,16 +1013,17 @@
       const pageToSave = currentPageNum;
       
       return new Promise(resolve => {
-        drawCanvas.toBlob(drawBlob => {
-          highlightCanvas.toBlob(async hlBlob => {
-            const annotationObj = { draw: drawBlob, hl: hlBlob };
-            pageAnnotations[pageToSave] = annotationObj;
-            await idbPut('annotations', { 
-              key: currentPdfId + '_' + pageToSave, 
-              data: annotationObj 
-            });
+        drawCanvas.toBlob(async (blob) => {
+          if (!blob) {
             resolve();
-          }, 'image/png');
+            return;
+          }
+          pageAnnotations[pageToSave] = blob;
+          await idbPut('annotations', { 
+            key: currentPdfId + '_' + pageToSave, 
+            data: blob 
+          });
+          resolve();
         }, 'image/png');
       });
     }
@@ -1176,12 +1037,9 @@
 
       undoStack = [];
       redoStack = [];
-      resetView(); 
 
       const page = await pdfDoc.getPage(num);
-      
-      // Increased Baseline Scale to beautifully offset blur without crashing iOS Safari
-      const viewport = page.getViewport({ scale: 2.0 }); 
+      const viewport = page.getViewport({ scale: 1.5 });
       const dpr = window.devicePixelRatio || 1;
       
       initCanvasSize(viewport.width, viewport.height, viewport.scale);
@@ -1205,44 +1063,38 @@
 
       currentPageNum = num;
       drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
-      highlightCtx.clearRect(0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
 
       let saved = pageAnnotations[num];
       if (saved === undefined) {
         const rec = await idbGet('annotations', currentPdfId + '_' + num);
-        saved = rec ? rec.data : null;
+        
+        if (rec && rec.data) {
+          saved = rec.data; 
+        } else if (rec && rec.dataUrl) {
+          saved = rec.dataUrl;
+        } else {
+          saved = null;
+        }
         pageAnnotations[num] = saved;
       }
       
       if (saved) {
-        if (saved instanceof Blob) {
-          const img = new Image();
-          const objectUrl = URL.createObjectURL(saved);
-          img.onload = () => {
-            drawCtx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
-            URL.revokeObjectURL(objectUrl);
-          };
-          img.src = objectUrl;
-        } else if (saved.draw || saved.hl) {
-          if (saved.hl) {
-            const hlImg = new Image();
-            const hlUrl = URL.createObjectURL(saved.hl);
-            hlImg.onload = () => {
-              highlightCtx.drawImage(hlImg, 0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
-              URL.revokeObjectURL(hlUrl);
-            };
-            hlImg.src = hlUrl;
-          }
-          if (saved.draw) {
-            const drawImg = new Image();
-            const drawUrl = URL.createObjectURL(saved.draw);
-            drawImg.onload = () => {
-              drawCtx.drawImage(drawImg, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
-              URL.revokeObjectURL(drawUrl);
-            };
-            drawImg.src = drawUrl;
-          }
-        }
+        const img = new Image();
+        const isBlob = saved instanceof Blob;
+        const objectUrl = isBlob ? URL.createObjectURL(saved) : saved;
+        
+        img.onload = () => {
+           const oldOp = drawCtx.globalCompositeOperation;
+           const oldAlpha = drawCtx.globalAlpha;
+           
+           drawCtx.globalCompositeOperation = 'source-over';
+           drawCtx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+           drawCtx.globalCompositeOperation = oldOp;
+           drawCtx.globalAlpha = oldAlpha;
+           
+           if (isBlob) URL.revokeObjectURL(objectUrl); 
+        };
+        img.src = objectUrl;
       }
       
       updatePageControls();
@@ -1278,28 +1130,32 @@
           if (annotationData === undefined) {
              const rec = await idbGet('annotations', currentPdfId + '_' + pageNum);
              if (rec && rec.data) annotationData = rec.data;
+             else if (rec && rec.dataUrl) annotationData = rec.dataUrl;
           }
-
           if (annotationData) {
-            const page = pages[i];
-            const { width, height } = page.getSize();
-
-            if (annotationData.hl && annotationData.hl instanceof Blob) {
-              const hlBytes = await annotationData.hl.arrayBuffer();
-              const hlImage = await pdf.embedPng(hlBytes);
-              page.drawImage(hlImage, {
-                x: 0, y: 0, width, height,
-                blendMode: BlendMode.Multiply
-              });
+            let pngImageBytes;
+            if (annotationData instanceof Blob) {
+              pngImageBytes = await annotationData.arrayBuffer();
+            } else if (typeof annotationData === 'string' && annotationData.startsWith('data:image/png;base64,')) {
+               const b64 = annotationData.split(',')[1];
+               const binStr = atob(b64);
+               const arr = new Uint8Array(binStr.length);
+               for (let k = 0; k < binStr.length; k++) arr[k] = binStr.charCodeAt(k);
+               pngImageBytes = arr.buffer;
             }
-
-            const drawTarget = annotationData.draw || (annotationData instanceof Blob ? annotationData : null);
-            if (drawTarget && drawTarget instanceof Blob) {
-              const drawBytes = await drawTarget.arrayBuffer();
-              const drawImage = await pdf.embedPng(drawBytes);
-              page.drawImage(drawImage, {
-                x: 0, y: 0, width, height
-              });
+            
+            if (pngImageBytes) {
+               const pngImage = await pdf.embedPng(pngImageBytes);
+               const page = pages[i];
+               const { width, height } = page.getSize();
+               
+               page.drawImage(pngImage, {
+                 x: 0,
+                 y: 0,
+                 width: width,
+                 height: height,
+                 blendMode: BlendMode.Multiply
+               });
             }
           }
         }
