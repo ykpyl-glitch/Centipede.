@@ -143,7 +143,6 @@
     .pdf-item:hover { background: var(--text-bright); color: #000; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1); }
     .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; opacity: 0.7; }
 
-    /* ---------- BUTTONS & TOOL GROUPS ---------- */
     .btn {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -168,7 +167,6 @@
     #view-viewer { flex-direction: column; }
     .viewer-toolbar { gap: 6px; }
 
-    /* ---------- POPOVER MENUS ---------- */
     .tool-wrapper { position: relative; display: inline-block; }
     
     .tool-popover {
@@ -247,7 +245,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      overflow: hidden; /* Pinch/Pan managed via matrix */
+      overflow: hidden; 
     }
 
     #canvas-container {
@@ -265,7 +263,6 @@
     #pdf-canvas { z-index: 1; touch-action: none; }
     .textLayer { z-index: 2; opacity: 0.5; } 
     
-    /* LAYER 1: MULTIPLY BLEND MODE ONLY ON HIGHLIGHT CANVAS */
     #highlight-canvas {
       z-index: 3;
       touch-action: none;
@@ -273,7 +270,6 @@
       mix-blend-mode: multiply;
     }
 
-    /* LAYER 2: DRAW CANVAS IS NORMAL (Allows white pen on dark PDFs) */
     #draw-canvas { 
       z-index: 4; 
       touch-action: none; 
@@ -370,7 +366,6 @@
       <div class="viewer-toolbar">
         <button class="btn" onclick="showMenu()">☰ MENU</button>
         
-        <!-- Pen Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-pen" class="btn active" onclick="handleToolClick('pen')">PEN</button>
           <div id="popover-pen" class="tool-popover">
@@ -391,7 +386,6 @@
           </div>
         </div>
 
-        <!-- Highlighter Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-highlighter" class="btn" onclick="handleToolClick('highlighter')">HIGHLIGHT</button>
           <div id="popover-highlighter" class="tool-popover">
@@ -411,7 +405,6 @@
           </div>
         </div>
 
-        <!-- Eraser Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-eraser" class="btn" onclick="handleToolClick('eraser')">ERASE</button>
           <div id="popover-eraser" class="tool-popover">
@@ -460,7 +453,10 @@
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // Core States
+    // HD RESOLUTION ENGINE (Fixes pixelation on zoom)
+    const HD_RESOLUTION = 3; 
+    function getDPR() { return (window.devicePixelRatio || 1) * HD_RESOLUTION; }
+
     let currentTool = 'pen'; 
     let isDrawing = false;
     let activePenId = null;
@@ -476,7 +472,6 @@
     
     let activePopover = null;
 
-    // Zoom & Pan Variables
     let currentScale = 1;
     let currentPanX = 0;
     let currentPanY = 0;
@@ -486,7 +481,6 @@
     let initPan = { x: 0, y: 0 };
     let initCenter = { x: 0, y: 0 };
 
-    // Undo / Redo Stacks (stores snapshots of BOTH canvases)
     let undoStack = [];
     let redoStack = [];
     const MAX_HISTORY = 20;
@@ -603,7 +597,6 @@
       document.getElementById('status-text').innerText = "SYSTEM READY // LIBRARY LOADED";
     }
 
-    // --- UI MANAGER ---
     async function showMenu() {
       closePopovers();
       await saveCurrentPageAnnotation();
@@ -715,7 +708,6 @@
       }
     }
 
-    // --- ROBUST PINCH TO ZOOM & PAN ENGINE ---
     function applyTransform() {
       const container = document.getElementById('canvas-container');
       container.style.transform = `translate3d(${currentPanX}px, ${currentPanY}px, 0) scale(${currentScale})`;
@@ -737,7 +729,6 @@
     }
 
     workspaceEl.addEventListener('touchstart', (e) => {
-      // Initiate pinch only if not actively drawing
       if (e.touches.length >= 2 && !isDrawing) {
         e.preventDefault();
         isPinching = true;
@@ -789,7 +780,7 @@
 
     function initCanvasSize(w, h, scale) {
       const container = document.getElementById('canvas-container');
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = getDPR(); // Applying High-Res Multiplier
 
       container.style.width = w + 'px';
       container.style.height = h + 'px';
@@ -812,7 +803,6 @@
       highlightCtx.scale(dpr, dpr);
     }
 
-    // --- ACCURATE UN-SCALED COORDINATE MAPPING ---
     function getPos(e) {
       const rect = drawCanvas.getBoundingClientRect();
       return { 
@@ -821,7 +811,6 @@
       };
     }
 
-    // --- DUAL-CANVAS UNDO / REDO ENGINE ---
     function pushStateToHistory() {
       if (undoStack.length >= MAX_HISTORY) undoStack.shift();
       undoStack.push({
@@ -860,14 +849,13 @@
     function clearCurrentPage() {
       closePopovers();
       pushStateToHistory(); 
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = getDPR();
       drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
       highlightCtx.clearRect(0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
       saveCurrentPageAnnotation();
       document.getElementById('status-text').innerText = `CLEARED // PAGE ${currentPageNum}`;
     }
 
-    // --- DRAWING PIPELINE ROUTING ---
     function getActiveCtx() {
       return (currentTool === 'highlighter') ? highlightCtx : drawCtx;
     }
@@ -930,25 +918,17 @@
 
     function shouldAcceptPointer(e) {
       if (interactionMode !== 'draw') return false; 
-      
-      // HIERARCHY RULE 1: Apple Pencil overrides all gestures.
       if (e.pointerType === 'pen') return true; 
-      
-      // HIERARCHY RULE 2: Block finger drawing if user is currently zooming
       if (isPinching) return false; 
-      
       if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary) return true;
       return false;
     }
 
     function startDrawing(e) {
+      closePopovers();
       if (!shouldAcceptPointer(e)) return;
 
-      closePopovers();
-      e.preventDefault();
-      e.stopPropagation();
-
-      // HIERARCHY RULE 3: If Pen strikes glass, forcefully abort any active pinch gesture
+      // Force Apple Pencil to win hardware locks
       if (e.pointerType === 'pen') {
         isPinching = false;
       }
@@ -973,9 +953,6 @@
 
     function draw(e) {
       if (!isDrawing || e.pointerId !== activePenId) return;
-      
-      e.preventDefault();
-      e.stopPropagation();
       
       const events = (typeof e.getCoalescedEvents === 'function') 
         ? e.getCoalescedEvents() 
@@ -1016,9 +993,6 @@
 
     function stopDrawing(e) {
       if (e.pointerId !== activePenId) return;
-      e.preventDefault();
-      e.stopPropagation();
-
       isDrawing = false;
       activePenId = null;
       strokePoints = [];
@@ -1026,9 +1000,6 @@
 
     function cancelDrawing(e) {
       if (e.pointerId !== activePenId) return;
-      e.preventDefault();
-      e.stopPropagation();
-
       isDrawing = false;
       activePenId = null;
       strokePoints = [];
@@ -1039,6 +1010,11 @@
     drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
     drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
     drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
+    
+    drawCanvas.addEventListener('touchstart', (e) => {
+      // Prevents Safari's 300ms double-tap timer from eating single fast dots
+      if (e.touches.length === 1) e.preventDefault();
+    }, { passive: false });
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentPdfId) {
@@ -1204,7 +1180,7 @@
 
       const page = await pdfDoc.getPage(num);
       const viewport = page.getViewport({ scale: 1.5 });
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = getDPR();
       
       initCanvasSize(viewport.width, viewport.height, viewport.scale);
 
