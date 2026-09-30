@@ -453,10 +453,6 @@
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // HD RESOLUTION ENGINE (Fixes pixelation on zoom)
-    const HD_RESOLUTION = 3; 
-    function getDPR() { return (window.devicePixelRatio || 1) * HD_RESOLUTION; }
-
     let currentTool = 'pen'; 
     let isDrawing = false;
     let activePenId = null;
@@ -780,7 +776,7 @@
 
     function initCanvasSize(w, h, scale) {
       const container = document.getElementById('canvas-container');
-      const dpr = getDPR(); // Applying High-Res Multiplier
+      const dpr = window.devicePixelRatio || 1; 
 
       container.style.width = w + 'px';
       container.style.height = h + 'px';
@@ -849,7 +845,7 @@
     function clearCurrentPage() {
       closePopovers();
       pushStateToHistory(); 
-      const dpr = getDPR();
+      const dpr = window.devicePixelRatio || 1;
       drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
       highlightCtx.clearRect(0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
       saveCurrentPageAnnotation();
@@ -928,7 +924,9 @@
       closePopovers();
       if (!shouldAcceptPointer(e)) return;
 
-      // Force Apple Pencil to win hardware locks
+      e.preventDefault();
+      e.stopPropagation();
+
       if (e.pointerType === 'pen') {
         isPinching = false;
       }
@@ -953,6 +951,9 @@
 
     function draw(e) {
       if (!isDrawing || e.pointerId !== activePenId) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
       
       const events = (typeof e.getCoalescedEvents === 'function') 
         ? e.getCoalescedEvents() 
@@ -993,6 +994,8 @@
 
     function stopDrawing(e) {
       if (e.pointerId !== activePenId) return;
+      e.preventDefault();
+      e.stopPropagation();
       isDrawing = false;
       activePenId = null;
       strokePoints = [];
@@ -1000,6 +1003,8 @@
 
     function cancelDrawing(e) {
       if (e.pointerId !== activePenId) return;
+      e.preventDefault();
+      e.stopPropagation();
       isDrawing = false;
       activePenId = null;
       strokePoints = [];
@@ -1010,11 +1015,6 @@
     drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
     drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
     drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
-    
-    drawCanvas.addEventListener('touchstart', (e) => {
-      // Prevents Safari's 300ms double-tap timer from eating single fast dots
-      if (e.touches.length === 1) e.preventDefault();
-    }, { passive: false });
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentPdfId) {
@@ -1179,8 +1179,10 @@
       resetView(); 
 
       const page = await pdfDoc.getPage(num);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const dpr = getDPR();
+      
+      // Increased Baseline Scale to beautifully offset blur without crashing iOS Safari
+      const viewport = page.getViewport({ scale: 2.0 }); 
+      const dpr = window.devicePixelRatio || 1;
       
       initCanvasSize(viewport.width, viewport.height, viewport.scale);
 
