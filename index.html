@@ -40,7 +40,7 @@
       font-family: 'Share Tech Mono', monospace;
       height: 100%;
       overflow: hidden;
-      touch-action: none;
+      touch-action: none !important;
       overscroll-behavior: none;
     }
 
@@ -143,7 +143,6 @@
     .pdf-item:hover { background: var(--text-bright); color: #000; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1); }
     .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; opacity: 0.7; }
 
-    /* ---------- BUTTONS & TOOL GROUPS ---------- */
     .btn {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -168,7 +167,6 @@
     #view-viewer { flex-direction: column; }
     .viewer-toolbar { gap: 6px; }
 
-    /* ---------- POPOVER MENUS ---------- */
     .tool-wrapper { position: relative; display: inline-block; }
     
     .tool-popover {
@@ -217,14 +215,22 @@
     input[type="color"]::-webkit-color-swatch { border: 2px solid var(--border); border-radius: 50%; }
     
     .size-preview-container {
-      width: 44px; height: 44px; 
-      display: flex; align-items: center; justify-content: center;
-      background: #ffffff; /* Reverted to white so black pen is visible */
+      width: 44px; 
+      height: 44px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      background: #2a2a30; 
       border-radius: 6px; 
       border: 1px solid var(--border);
-      overflow: hidden; /* Contains massive brush sizes from breaking the box */
+      overflow: hidden;
+      flex-shrink: 0;
     }
-    .size-preview-dot { border-radius: 50%; }
+    .size-preview-dot { 
+      border-radius: 50%; 
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.15); 
+      transition: width 0.05s ease, height 0.05s ease;
+    }
 
     input[type=range] { -webkit-appearance: none; background: transparent; flex: 1; }
     input[type=range]:focus { outline: none; }
@@ -239,31 +245,41 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      overflow: auto;
+      overflow: hidden;
+      touch-action: none !important;
     }
 
     #canvas-container {
       position: relative;
       background: #ffffff;
       margin: auto;
-      transform-origin: top left;
+      transform-origin: center center; 
       border-radius: 6px;
       overflow: hidden;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+      touch-action: none !important;
     }
 
-    canvas, .textLayer { position: absolute; top: 0; left: 0; }
-    #pdf-canvas { z-index: 1; touch-action: none; }
+    canvas, .textLayer { 
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      touch-action: none !important;
+    }
+    #pdf-canvas { z-index: 1; }
     .textLayer { z-index: 2; opacity: 0.5; } 
     
-    /* MULTIPLY BLEND MODE applied directly to the canvas HTML element. */
+    #highlight-canvas {
+      z-index: 3;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+    }
+
     #draw-canvas { 
-      z-index: 3; 
-      touch-action: none; 
+      z-index: 4; 
       cursor: crosshair; 
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
-      mix-blend-mode: multiply; 
     }
 
     #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
@@ -302,11 +318,16 @@
       background: rgba(0,0,0,0.85);
       border: 1px solid var(--border);
       color: var(--text-dim);
-      padding: 4px 10px;
+      padding: 6px 12px;
       font-size: 11px;
-      border-radius: 3px;
+      border-radius: 4px;
       z-index: 10;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.1s ease;
+      font-family: inherit;
     }
+    .page-pill:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .page-pill:active { transform: translateX(-50%) scale(0.95); }
 
     .status-bar {
       background: #000;
@@ -349,13 +370,13 @@
       <div class="viewer-toolbar">
         <button class="btn" onclick="showMenu()">☰ MENU</button>
         
-        <!-- Pen Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-pen" class="btn active" onclick="handleToolClick('pen')">PEN</button>
           <div id="popover-pen" class="tool-popover">
             <div class="popover-row">
               <div class="color-presets">
                 <div class="color-swatch" style="background:#000000;" onclick="updateToolSettings('pen', 'color', '#000000')"></div>
+                <div class="color-swatch" style="background:#ffffff;" onclick="updateToolSettings('pen', 'color', '#ffffff')"></div>
                 <div class="color-swatch" style="background:#ff0033;" onclick="updateToolSettings('pen', 'color', '#ff0033')"></div>
                 <div class="color-swatch" style="background:#2962ff;" onclick="updateToolSettings('pen', 'color', '#2962ff')"></div>
                 <div class="color-swatch" style="background:#00c853;" onclick="updateToolSettings('pen', 'color', '#00c853')"></div>
@@ -369,7 +390,6 @@
           </div>
         </div>
 
-        <!-- Highlighter Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-highlighter" class="btn" onclick="handleToolClick('highlighter')">HIGHLIGHT</button>
           <div id="popover-highlighter" class="tool-popover">
@@ -386,10 +406,12 @@
               <input type="range" min="4" max="60" value="12" oninput="updateToolSettings('highlighter', 'size', this.value)">
               <div class="size-preview-container"><div id="hl-preview-dot" class="size-preview-dot"></div></div>
             </div>
+            <div class="popover-row" style="margin-top: 4px;">
+              <button id="hl-snap-toggle" class="btn" style="width: 100%; justify-content: center;" onclick="toggleHlSnap()">LINE SNAP: OFF</button>
+            </div>
           </div>
         </div>
 
-        <!-- Eraser Tool Popover -->
         <div class="tool-wrapper">
           <button id="btn-eraser" class="btn" onclick="handleToolClick('eraser')">ERASE</button>
           <div id="popover-eraser" class="tool-popover">
@@ -401,10 +423,9 @@
         </div>
         
         <button id="btn-touch-toggle" class="btn" onclick="toggleFingerDrawing()">FINGER: OFF</button>
-        <button class="btn" onclick="clearCanvas()">CLEAR PAGE</button>
+        <button class="btn" onclick="clearCurrentPage()">CLEAR PAGE</button>
         <button class="btn" onclick="exportFullPdf()">EXPORT</button>
 
-        <!-- Right Side Cluster: UNDO & REDO immediately left of MODE -->
         <div style="margin-left: auto; display: flex; gap: 6px;">
           <button class="btn" onclick="undoCanvas()">↩ UNDO</button>
           <button class="btn" onclick="redoCanvas()">REDO ↪</button>
@@ -418,11 +439,12 @@
         <div id="canvas-container" class="mode-draw">
           <canvas id="pdf-canvas"></canvas>
           <div id="text-layer" class="textLayer"></div>
+          <canvas id="highlight-canvas"></canvas>
           <canvas id="draw-canvas"></canvas>
         </div>
         
         <button class="page-arrow right" id="btn-next-page" onclick="nextPage()">▶</button>
-        <div class="page-pill" id="page-info">PAGE: 0 / 0</div>
+        <button class="page-pill" id="page-info" onclick="resetView()">PAGE: 0 / 0</button>
       </div>
     </section>
   </main>
@@ -436,17 +458,21 @@
       });
     }
 
+    // Suppress WebKit default gestures globally
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(name => {
+      document.addEventListener(name, (e) => e.preventDefault(), { passive: false });
+    });
+
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // Core States
     let currentTool = 'pen'; 
     let isDrawing = false;
+    let isPageDirty = false;
     let activePenId = null;
     let strokePoints = []; 
     let allowFingerDrawing = false; 
     let interactionMode = 'draw'; 
 
-    // Tool Settings State
     let toolSettings = {
       pen: { size: 3, color: '#000000' },
       highlighter: { size: 12, color: '#ffeb3b' },
@@ -454,8 +480,29 @@
     };
     
     let activePopover = null;
+    
+    let isHlSnap = false;
+    const strokeSnapshotCanvasDraw = document.createElement('canvas');
+    const strokeSnapshotCanvasHl = document.createElement('canvas');
 
-    // Undo / Redo Stacks
+    // Viewport & Scale Management
+    let baseWidth = 0;
+    let baseHeight = 0;
+    let fitScale = 1.0;
+    let currentScale = 1;
+    let currentPanX = 0;
+    let currentPanY = 0;
+    let isPinching = false;
+    let initDist = 0;
+    let initScale = 1;
+    let initPan = { x: 0, y: 0 };
+    let initCenter = { x: 0, y: 0 };
+    let zoomDebounceTimer = null;
+    let currentRenderTask = null;
+
+    // Background Page Pre-fetch Cache
+    const pdfPageCache = new Map();
+
     let undoStack = [];
     let redoStack = [];
     const MAX_HISTORY = 20;
@@ -471,6 +518,8 @@
 
     const pdfCanvas = document.getElementById('pdf-canvas');
     const pdfCtx = pdfCanvas.getContext('2d', { alpha: false });
+    const highlightCanvas = document.getElementById('highlight-canvas');
+    const highlightCtx = highlightCanvas.getContext('2d');
     const drawCanvas = document.getElementById('draw-canvas');
     const drawCtx = drawCanvas.getContext('2d');
     const textLayerDiv = document.getElementById('text-layer');
@@ -570,10 +619,9 @@
       document.getElementById('status-text').innerText = "SYSTEM READY // LIBRARY LOADED";
     }
 
-    // --- UI MANAGER ---
-    async function showMenu() {
+    function showMenu() {
       closePopovers();
-      await saveCurrentPageAnnotation();
+      saveCurrentPageAnnotation();
       document.getElementById('view-viewer').classList.remove('active');
       document.getElementById('view-menu').classList.add('active');
       renderFolders();
@@ -650,21 +698,24 @@
 
     function updatePreviews() {
       const penDot = document.getElementById('pen-preview-dot');
-      penDot.style.width = toolSettings.pen.size + 'px';
-      penDot.style.height = toolSettings.pen.size + 'px';
+      const visualPenSize = Math.min(toolSettings.pen.size, 38);
+      penDot.style.width = visualPenSize + 'px';
+      penDot.style.height = visualPenSize + 'px';
       penDot.style.backgroundColor = toolSettings.pen.color;
 
       const hlDot = document.getElementById('hl-preview-dot');
-      hlDot.style.width = toolSettings.highlighter.size + 'px';
-      hlDot.style.height = toolSettings.highlighter.size + 'px';
+      const visualHlSize = Math.min(toolSettings.highlighter.size, 38);
+      hlDot.style.width = visualHlSize + 'px';
+      hlDot.style.height = visualHlSize + 'px';
       hlDot.style.backgroundColor = toolSettings.highlighter.color;
-      hlDot.style.opacity = 0.4; 
+      hlDot.style.opacity = '0.75'; 
 
       const erDot = document.getElementById('eraser-preview-dot');
-      erDot.style.width = toolSettings.eraser.size + 'px';
-      erDot.style.height = toolSettings.eraser.size + 'px';
+      const visualEraserSize = Math.min(Math.round(toolSettings.eraser.size * (38 / 80) + 4), 38);
+      erDot.style.width = visualEraserSize + 'px';
+      erDot.style.height = visualEraserSize + 'px';
       erDot.style.backgroundColor = '#ffffff'; 
-      erDot.style.border = '1px solid #ccc'; // Adds a border so the white eraser dot is visible against the white background
+      erDot.style.border = '1px solid rgba(0, 0, 0, 0.4)';
     }
 
     function toggleFingerDrawing() {
@@ -679,70 +730,269 @@
       }
     }
 
-    function initCanvasSize(w, h, scale) {
+    function toggleHlSnap() {
+      isHlSnap = !isHlSnap;
+      const btn = document.getElementById('hl-snap-toggle');
+      if (isHlSnap) {
+        btn.innerText = 'LINE SNAP: ON';
+        btn.classList.add('active');
+      } else {
+        btn.innerText = 'LINE SNAP: OFF';
+        btn.classList.remove('active');
+      }
+    }
+
+    // --- PINCH-TO-ZOOM MATRIX ---
+    function applyTransform() {
+      const container = document.getElementById('canvas-container');
+      container.style.transform = `translate3d(${currentPanX}px, ${currentPanY}px, 0) scale(${currentScale})`;
+    }
+
+    function resetView() {
+      currentScale = 1;
+      currentPanX = 0;
+      currentPanY = 0;
+      applyTransform();
+      reRenderPdfSharp();
+    }
+
+    const workspaceEl = document.querySelector('.workspace');
+
+    // capture: true forces workspace to seize 2-finger zooms before TextLayer selects text
+    workspaceEl.addEventListener('touchstart', (e) => {
+      const touches = Array.from(e.touches);
+      if (touches.some(t => t.touchType === 'stylus')) {
+        isPinching = false;
+        return;
+      }
+
+      if (touches.length >= 2 && !isDrawing) {
+        e.preventDefault();
+        isPinching = true;
+
+        const t1 = touches[0];
+        const t2 = touches[1];
+
+        initDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        initCenter = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        };
+        initScale = currentScale;
+        initPan = { x: currentPanX, y: currentPanY };
+      }
+    }, { passive: false, capture: true });
+
+    workspaceEl.addEventListener('touchmove', (e) => {
+      if (isPinching && e.touches.length >= 2) {
+        e.preventDefault();
+
+        const touches = Array.from(e.touches);
+        if (touches.some(t => t.touchType === 'stylus')) {
+          isPinching = false;
+          return;
+        }
+
+        const t1 = touches[0];
+        const t2 = touches[1];
+
+        const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        const currentCenter = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        };
+
+        if (initDist === 0) return;
+
+        const scaleDiff = currentDist / initDist;
+        const newScale = Math.max(0.7, Math.min(initScale * scaleDiff, 5.0)); 
+
+        const dx = currentCenter.x - initCenter.x;
+        const dy = currentCenter.y - initCenter.y;
+
+        currentScale = newScale;
+        currentPanX = initPan.x + dx;
+        currentPanY = initPan.y + dy;
+
+        applyTransform();
+      }
+    }, { passive: false, capture: true });
+
+    function handleTouchEnd(e) {
+      if (e.touches.length < 2) {
+        if (isPinching) {
+          isPinching = false;
+          clearTimeout(zoomDebounceTimer);
+          zoomDebounceTimer = setTimeout(reRenderPdfSharp, 150);
+        }
+      }
+    }
+
+    workspaceEl.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
+    workspaceEl.addEventListener('touchcancel', handleTouchEnd, { passive: false, capture: true });
+
+    // DYNAMIC VECTOR RE-RASTERIZATION ENGINE (Background rendering prevents flashes)
+    async function reRenderPdfSharp() {
+      if (!pdfDoc || !baseWidth || !baseHeight) return;
+      const dpr = window.devicePixelRatio || 1;
+      const zoomFactor = Math.min(Math.max(currentScale, 1.0), 3.0);
+      
+      const targetW = Math.round(baseWidth * dpr * zoomFactor);
+      const targetH = Math.round(baseHeight * dpr * zoomFactor);
+      
+      if (targetW * targetH > 15000000) return;
+
+      const page = await pdfDoc.getPage(currentPageNum);
+      const viewport = page.getViewport({ scale: fitScale * dpr * zoomFactor });
+
+      if (currentRenderTask) {
+        try { currentRenderTask.cancel(); } catch (err) {}
+      }
+
+      // Draw onto an offscreen canvas to prevent the screen from going blank while loading
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = targetW;
+      tempCanvas.height = targetH;
+      const tempCtx = tempCanvas.getContext('2d', { alpha: false });
+      tempCtx.drawImage(pdfCanvas, 0, 0, targetW, targetH);
+
+      currentRenderTask = page.render({
+        canvasContext: tempCtx,
+        viewport: viewport
+      });
+
+      try {
+        await currentRenderTask.promise;
+        pdfCanvas.width = targetW;
+        pdfCanvas.height = targetH;
+        pdfCanvas.style.width = baseWidth + 'px';
+        pdfCanvas.style.height = baseHeight + 'px';
+        pdfCtx.drawImage(tempCanvas, 0, 0);
+
+        // Update instant-flip cache
+        if (currentScale === 1 && !pdfPageCache.has(currentPageNum)) {
+           const cacheCanvas = document.createElement('canvas');
+           cacheCanvas.width = targetW;
+           cacheCanvas.height = targetH;
+           cacheCanvas.getContext('2d', {alpha:false}).drawImage(tempCanvas, 0, 0);
+           pdfPageCache.set(currentPageNum, cacheCanvas);
+        }
+      } catch (err) {}
+    }
+
+    // Background Page Pre-fetcher
+    async function preRenderPage(num) {
+      if (!pdfDoc || num > totalPages || num < 1 || pdfPageCache.has(num)) return;
+      try {
+        const page = await pdfDoc.getPage(num);
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const availW = Math.max(workspaceEl.clientWidth - 32, 320);
+        const availH = Math.max(workspaceEl.clientHeight - 32, 320);
+        const tempFitScale = Math.min(availW / unscaledViewport.width, availH / unscaledViewport.height);
+        
+        const dpr = window.devicePixelRatio || 1;
+        const viewport = page.getViewport({ scale: tempFitScale * dpr });
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+        pdfPageCache.set(num, canvas);
+        
+        if (pdfPageCache.size > 6) {
+          pdfPageCache.delete(pdfPageCache.keys().next().value);
+        }
+      } catch (e) {}
+    }
+
+    function initCanvasDimensions(w, h) {
       const container = document.getElementById('canvas-container');
       const dpr = window.devicePixelRatio || 1;
 
       container.style.width = w + 'px';
       container.style.height = h + 'px';
-
       textLayerDiv.style.width = w + 'px';
       textLayerDiv.style.height = h + 'px';
-      textLayerDiv.style.setProperty('--scale-factor', scale);
 
-      pdfCanvas.width = w * dpr;
-      pdfCanvas.height = h * dpr;
-      pdfCanvas.style.width = w + 'px';
-      pdfCanvas.style.height = h + 'px';
+      [drawCanvas, highlightCanvas].forEach(c => {
+        c.width = w * dpr;
+        c.height = h * dpr;
+        c.style.width = w + 'px';
+        c.style.height = h + 'px';
+      });
 
-      drawCanvas.width = w * dpr;
-      drawCanvas.height = h * dpr;
-      drawCanvas.style.width = w + 'px';
-      drawCanvas.style.height = h + 'px';
+      if (pdfCanvas.width !== Math.round(w * dpr) || pdfCanvas.height !== Math.round(h * dpr)) {
+         pdfCanvas.width = w * dpr;
+         pdfCanvas.height = h * dpr;
+         pdfCanvas.style.width = w + 'px';
+         pdfCanvas.style.height = h + 'px';
+      }
 
       drawCtx.setTransform(1, 0, 0, 1, 0, 0);
       drawCtx.scale(dpr, dpr);
+      highlightCtx.setTransform(1, 0, 0, 1, 0, 0);
+      highlightCtx.scale(dpr, dpr);
     }
 
     function getPos(e) {
       const rect = drawCanvas.getBoundingClientRect();
-      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      return { 
+        x: (e.clientX - rect.left) * (baseWidth / rect.width), 
+        y: (e.clientY - rect.top) * (baseHeight / rect.height) 
+      };
     }
 
-    // --- UNDO / REDO ENGINE ---
     function pushStateToHistory() {
       if (undoStack.length >= MAX_HISTORY) undoStack.shift();
-      undoStack.push(drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height));
+      undoStack.push({
+        draw: drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height),
+        hl: highlightCtx.getImageData(0, 0, highlightCanvas.width, highlightCanvas.height)
+      });
       redoStack = []; 
     }
 
     function undoCanvas() {
       closePopovers();
       if (undoStack.length === 0) return;
-      redoStack.push(drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height));
+      redoStack.push({
+        draw: drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height),
+        hl: highlightCtx.getImageData(0, 0, highlightCanvas.width, highlightCanvas.height)
+      });
       const state = undoStack.pop();
-      drawCtx.putImageData(state, 0, 0);
-      saveCurrentPageAnnotation();
+      drawCtx.putImageData(state.draw, 0, 0);
+      highlightCtx.putImageData(state.hl, 0, 0);
+      isPageDirty = true;
     }
 
     function redoCanvas() {
       closePopovers();
       if (redoStack.length === 0) return;
-      undoStack.push(drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height));
+      undoStack.push({
+        draw: drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height),
+        hl: highlightCtx.getImageData(0, 0, highlightCanvas.width, highlightCanvas.height)
+      });
       const state = redoStack.pop();
-      drawCtx.putImageData(state, 0, 0);
-      saveCurrentPageAnnotation();
+      drawCtx.putImageData(state.draw, 0, 0);
+      highlightCtx.putImageData(state.hl, 0, 0);
+      isPageDirty = true;
     }
 
-    function clearCanvas() {
+    function clearCurrentPage() {
       closePopovers();
       pushStateToHistory(); 
       const dpr = window.devicePixelRatio || 1;
       drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
-      saveCurrentPageAnnotation();
+      highlightCtx.clearRect(0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
+      isPageDirty = true;
+      document.getElementById('status-text').innerText = `CLEARED // PAGE ${currentPageNum}`;
     }
 
-    // --- DRAWING ENGINE ---
+    function getActiveCtx() {
+      return (currentTool === 'highlighter') ? highlightCtx : drawCtx;
+    }
+
     function applyStrokeStyle() {
       if (currentTool === 'eraser') {
         drawCtx.globalAlpha = 1;
@@ -750,12 +1000,18 @@
         drawCtx.strokeStyle = '#000'; 
         drawCtx.fillStyle = '#000';
         drawCtx.lineWidth = toolSettings.eraser.size;
+
+        highlightCtx.globalAlpha = 1;
+        highlightCtx.globalCompositeOperation = 'destination-out';
+        highlightCtx.strokeStyle = '#000'; 
+        highlightCtx.fillStyle = '#000';
+        highlightCtx.lineWidth = toolSettings.eraser.size;
       } else if (currentTool === 'highlighter') {
-        drawCtx.globalAlpha = 1; 
-        drawCtx.globalCompositeOperation = 'source-over';
-        drawCtx.strokeStyle = toolSettings.highlighter.color; 
-        drawCtx.fillStyle = toolSettings.highlighter.color;
-        drawCtx.lineWidth = toolSettings.highlighter.size;
+        highlightCtx.globalAlpha = 1; 
+        highlightCtx.globalCompositeOperation = 'source-over';
+        highlightCtx.strokeStyle = toolSettings.highlighter.color; 
+        highlightCtx.fillStyle = toolSettings.highlighter.color;
+        highlightCtx.lineWidth = toolSettings.highlighter.size;
       } else {
         drawCtx.globalAlpha = 1;
         drawCtx.globalCompositeOperation = 'source-over';
@@ -766,68 +1022,124 @@
       
       drawCtx.lineCap = 'round';
       drawCtx.lineJoin = 'round';
+      highlightCtx.lineCap = 'round';
+      highlightCtx.lineJoin = 'round';
     }
 
     function drawPoint(p) {
       applyStrokeStyle();
-      drawCtx.beginPath();
       
-      let radius = 1;
-      if (currentTool === 'eraser') radius = toolSettings.eraser.size / 2;
-      else if (currentTool === 'highlighter') radius = toolSettings.highlighter.size / 2;
-      else radius = toolSettings.pen.size / 2;
-      
-      drawCtx.arc(p.x, p.y, radius, 0, Math.PI * 2);
-      drawCtx.fill();
+      if (currentTool === 'eraser') {
+        const radius = toolSettings.eraser.size / 2;
+        [drawCtx, highlightCtx].forEach(ctx => {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        return;
+      }
+
+      const ctx = getActiveCtx();
+      const radius = (currentTool === 'highlighter') 
+        ? toolSettings.highlighter.size / 2 
+        : toolSettings.pen.size / 2;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     function shouldAcceptPointer(e) {
       if (interactionMode !== 'draw') return false; 
-      if (e.pointerType === 'pen') return true;
-      if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary) return true;
+      if (e.pointerType === 'pen') return true; 
+      if (allowFingerDrawing && e.pointerType === 'touch' && e.isPrimary && !isPinching) {
+        return true;
+      }
       return false;
     }
 
     function startDrawing(e) {
-      closePopovers();
-      e.preventDefault();
-      e.stopPropagation();
-
       if (!shouldAcceptPointer(e)) return;
-      
-      if (activePenId !== null && activePenId !== e.pointerId) {
-        isDrawing = false;
-        try { drawCanvas.releasePointerCapture(activePenId); } catch (err) {}
+      closePopovers();
+
+      if (e.pointerType === 'pen') {
+        isPinching = false;
       }
-      
+
       activePenId = e.pointerId;
       isDrawing = true;
+      isPageDirty = true;
       
       pushStateToHistory(); 
+
+      strokeSnapshotCanvasDraw.width = drawCanvas.width;
+      strokeSnapshotCanvasDraw.height = drawCanvas.height;
+      strokeSnapshotCanvasDraw.getContext('2d').drawImage(drawCanvas, 0, 0);
+
+      strokeSnapshotCanvasHl.width = highlightCanvas.width;
+      strokeSnapshotCanvasHl.height = highlightCanvas.height;
+      strokeSnapshotCanvasHl.getContext('2d').drawImage(highlightCanvas, 0, 0);
 
       const startPt = getPos(e);
       strokePoints = [startPt]; 
       
       try { drawCanvas.setPointerCapture(activePenId); } catch (err) {}
-      
       drawPoint(startPt);
     }
 
     function draw(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      
       if (!isDrawing || e.pointerId !== activePenId) return;
       
       const events = (typeof e.getCoalescedEvents === 'function') 
         ? e.getCoalescedEvents() 
         : [e];
 
+      if (currentTool === 'highlighter' && isHlSnap) {
+        let pt = getPos(events[events.length - 1]);
+        
+        const dx = pt.x - strokePoints[0].x;
+        const dy = pt.y - strokePoints[0].y;
+        const angle = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI);
+        
+        if (angle < 15 || angle > 165) {
+          pt.y = strokePoints[0].y; 
+        } else if (Math.abs(angle - 90) < 15) {
+          pt.x = strokePoints[0].x; 
+        }
+
+        const dpr = window.devicePixelRatio || 1;
+        
+        drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+        drawCtx.drawImage(strokeSnapshotCanvasDraw, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+
+        highlightCtx.clearRect(0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
+        highlightCtx.drawImage(strokeSnapshotCanvasHl, 0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
+
+        applyStrokeStyle();
+        const ctx = getActiveCtx();
+
+        ctx.beginPath();
+        ctx.moveTo(strokePoints[0].x, strokePoints[0].y);
+        ctx.lineTo(pt.x, pt.y);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(strokePoints[0].x, strokePoints[0].y, toolSettings.highlighter.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, toolSettings.highlighter.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        return; 
+      }
+
       for (let i = 0; i < events.length; i++) {
         const pt = getPos(events[i]);
         strokePoints.push(pt);
-        
         applyStrokeStyle();
+        
+        const targets = (currentTool === 'eraser') ? [drawCtx, highlightCtx] : [getActiveCtx()];
+        
         if (strokePoints.length >= 3) {
           const p0 = strokePoints[strokePoints.length - 3];
           const p1 = strokePoints[strokePoints.length - 2];
@@ -836,45 +1148,35 @@
           const mid1 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
           const mid2 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
           
-          drawCtx.beginPath();
-          drawCtx.moveTo(mid1.x, mid1.y);
-          drawCtx.quadraticCurveTo(p1.x, p1.y, mid2.x, mid2.y);
-          drawCtx.stroke();
+          targets.forEach(ctx => {
+            ctx.beginPath();
+            ctx.moveTo(mid1.x, mid1.y);
+            ctx.quadraticCurveTo(p1.x, p1.y, mid2.x, mid2.y);
+            ctx.stroke();
+          });
         } else if (strokePoints.length === 2) {
-          drawCtx.beginPath();
-          drawCtx.moveTo(strokePoints[0].x, strokePoints[0].y);
-          drawCtx.lineTo(strokePoints[1].x, strokePoints[1].y);
-          drawCtx.stroke();
+          targets.forEach(ctx => {
+            ctx.beginPath();
+            ctx.moveTo(strokePoints[0].x, strokePoints[0].y);
+            ctx.lineTo(strokePoints[1].x, strokePoints[1].y);
+            ctx.stroke();
+          });
         }
       }
     }
 
     function stopDrawing(e) {
       if (e.pointerId !== activePenId) return;
-      e.preventDefault();
-      e.stopPropagation();
-
       isDrawing = false;
       activePenId = null;
       strokePoints = [];
     }
 
-    function cancelDrawing(e) {
-      if (e.pointerId !== activePenId) return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      isDrawing = false;
-      activePenId = null;
-      strokePoints = [];
-    }
-
-    drawCanvas.addEventListener('pointerdown', startDrawing, { passive: false });
-    drawCanvas.addEventListener('pointermove', draw, { passive: false });
-    drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
-    drawCanvas.addEventListener('pointercancel', cancelDrawing, { passive: false });
-    drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
-    drawCanvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+    drawCanvas.addEventListener('pointerdown', startDrawing);
+    drawCanvas.addEventListener('pointermove', draw);
+    drawCanvas.addEventListener('pointerup', stopDrawing);
+    drawCanvas.addEventListener('pointercancel', stopDrawing);
+    drawCanvas.addEventListener('pointerleave', stopDrawing);
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentPdfId) {
@@ -974,7 +1276,6 @@
         folder.pdfs.push({ id, name: file.name });
         
         renderFolders(); 
-        
         openPdf(safeData, file.name, id);
         e.target.value = '';
       } catch (err) {
@@ -1001,7 +1302,8 @@
         currentPdfName = name;
         currentPageNum = 1;
         pageAnnotations = {};
-        renderPage(1, true); 
+        pdfPageCache.clear();
+        renderPage(1); 
       }).catch(err => {
         document.getElementById('status-text').innerText = "ERROR LOADING PDF";
         console.error(err);
@@ -1009,100 +1311,125 @@
     }
 
     function saveCurrentPageAnnotation() {
-      if (!pdfDoc || !currentPdfId) return Promise.resolve();
+      if (!pdfDoc || !currentPdfId || !isPageDirty) return;
       const pageToSave = currentPageNum;
-      
-      return new Promise(resolve => {
-        drawCanvas.toBlob(async (blob) => {
-          if (!blob) {
-            resolve();
-            return;
-          }
-          pageAnnotations[pageToSave] = blob;
-          await idbPut('annotations', { 
-            key: currentPdfId + '_' + pageToSave, 
-            data: blob 
-          });
-          resolve();
+      isPageDirty = false;
+
+      const dCopy = document.createElement('canvas');
+      dCopy.width = drawCanvas.width;
+      dCopy.height = drawCanvas.height;
+      dCopy.getContext('2d').drawImage(drawCanvas, 0, 0);
+
+      const hCopy = document.createElement('canvas');
+      hCopy.width = highlightCanvas.width;
+      hCopy.height = highlightCanvas.height;
+      hCopy.getContext('2d').drawImage(highlightCanvas, 0, 0);
+
+      pageAnnotations[pageToSave] = { draw: dCopy, hl: hCopy };
+
+      setTimeout(() => {
+        dCopy.toBlob(dBlob => {
+          hCopy.toBlob(async hBlob => {
+            await idbPut('annotations', { 
+              key: currentPdfId + '_' + pageToSave, 
+              data: { draw: dBlob, hl: hBlob } 
+            });
+          }, 'image/png');
         }, 'image/png');
-      });
+      }, 30);
     }
 
-    async function renderPage(num, isInitialLoad = false) {
+    // INSTANT DOUBLE-BUFFERED PAGE RENDERER
+    async function renderPage(num) {
       if (!pdfDoc || num < 1 || num > totalPages) return;
       
-      if (!isInitialLoad) {
-        await saveCurrentPageAnnotation();
-      }
-
+      saveCurrentPageAnnotation();
       undoStack = [];
       redoStack = [];
 
-      const page = await pdfDoc.getPage(num);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const dpr = window.devicePixelRatio || 1;
-      
-      initCanvasSize(viewport.width, viewport.height, viewport.scale);
-
-      const renderContext = {
-        canvasContext: pdfCtx,
-        viewport: viewport,
-        transform: [dpr, 0, 0, dpr, 0, 0]
-      };
-      
-      await page.render(renderContext).promise;
-
-      textLayerDiv.innerHTML = '';
-      const textContent = await page.getTextContent();
-      await pdfjsLib.renderTextLayer({
-        textContentSource: textContent,
-        container: textLayerDiv,
-        viewport: viewport,
-        textDivs: []
-      }).promise;
+      currentScale = 1;
+      currentPanX = 0;
+      currentPanY = 0;
+      applyTransform();
 
       currentPageNum = num;
-      drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+      updatePageControls();
+      document.getElementById('status-text').innerText = "LOADING PAGE...";
 
+      const page = await pdfDoc.getPage(num);
+      const unscaledViewport = page.getViewport({ scale: 1.0 });
+
+      const availW = Math.max(workspaceEl.clientWidth - 32, 320);
+      const availH = Math.max(workspaceEl.clientHeight - 32, 320);
+      fitScale = Math.min(availW / unscaledViewport.width, availH / unscaledViewport.height);
+
+      baseWidth = Math.floor(unscaledViewport.width * fitScale);
+      baseHeight = Math.floor(unscaledViewport.height * fitScale);
+      
+      initCanvasDimensions(baseWidth, baseHeight);
+
+      const dpr = window.devicePixelRatio || 1;
+      pdfCtx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+      drawCtx.clearRect(0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
+      highlightCtx.clearRect(0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
+      textLayerDiv.innerHTML = '';
+
+      // 1. Draw cached PDF instantly to screen
+      if (pdfPageCache.has(num)) {
+          pdfCtx.drawImage(pdfPageCache.get(num), 0, 0, pdfCanvas.width, pdfCanvas.height);
+      }
+
+      // 2. Draw Ink instantly to screen
       let saved = pageAnnotations[num];
       if (saved === undefined) {
         const rec = await idbGet('annotations', currentPdfId + '_' + num);
-        
-        if (rec && rec.data) {
-          saved = rec.data; 
-        } else if (rec && rec.dataUrl) {
-          saved = rec.dataUrl;
-        } else {
-          saved = null;
-        }
+        saved = rec ? rec.data : null;
         pageAnnotations[num] = saved;
       }
       
       if (saved) {
-        const img = new Image();
-        const isBlob = saved instanceof Blob;
-        const objectUrl = isBlob ? URL.createObjectURL(saved) : saved;
-        
-        img.onload = () => {
-           const oldOp = drawCtx.globalCompositeOperation;
-           const oldAlpha = drawCtx.globalAlpha;
-           
-           drawCtx.globalCompositeOperation = 'source-over';
-           drawCtx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
-           drawCtx.globalCompositeOperation = oldOp;
-           drawCtx.globalAlpha = oldAlpha;
-           
-           if (isBlob) URL.revokeObjectURL(objectUrl); 
-        };
-        img.src = objectUrl;
+        if (saved.hl) {
+          if (saved.hl instanceof HTMLCanvasElement) {
+            highlightCtx.drawImage(saved.hl, 0, 0, baseWidth, baseHeight);
+          } else if (saved.hl instanceof Blob) {
+            const img = new Image();
+            const url = URL.createObjectURL(saved.hl);
+            img.onload = () => { highlightCtx.drawImage(img, 0, 0, baseWidth, baseHeight); URL.revokeObjectURL(url); };
+            img.src = url;
+          }
+        }
+        const drawSrc = saved.draw || (saved instanceof Blob ? saved : null);
+        if (drawSrc) {
+          if (drawSrc instanceof HTMLCanvasElement) {
+            drawCtx.drawImage(drawSrc, 0, 0, baseWidth, baseHeight);
+          } else if (drawSrc instanceof Blob) {
+            const img = new Image();
+            const url = URL.createObjectURL(drawSrc);
+            img.onload = () => { drawCtx.drawImage(img, 0, 0, baseWidth, baseHeight); URL.revokeObjectURL(url); };
+            img.src = url;
+          }
+        }
       }
-      
-      updatePageControls();
-      document.getElementById('status-text').innerText = "READY // " + currentPdfName;
+
+      // 3. Render High-Res PDF in background (Non-blocking)
+      reRenderPdfSharp().then(async () => {
+        const textContent = await page.getTextContent();
+        await pdfjsLib.renderTextLayer({
+          textContentSource: textContent,
+          container: textLayerDiv,
+          viewport: page.getViewport({ scale: fitScale }),
+          textDivs: []
+        }).promise;
+
+        document.getElementById('status-text').innerText = "READY // " + currentPdfName;
+        
+        preRenderPage(num + 1);
+        if (num > 1) preRenderPage(num - 1);
+      });
     }
 
-    function nextPage() { if (pdfDoc && currentPageNum < totalPages) renderPage(currentPageNum + 1, false); }
-    function prevPage() { if (pdfDoc && currentPageNum > 1) renderPage(currentPageNum - 1, false); }
+    function nextPage() { if (pdfDoc && currentPageNum < totalPages) renderPage(currentPageNum + 1); }
+    function prevPage() { if (pdfDoc && currentPageNum > 1) renderPage(currentPageNum - 1); }
 
     function updatePageControls() {
       document.getElementById('page-info').innerText = `PAGE: ${currentPageNum} / ${totalPages}`;
@@ -1114,9 +1441,9 @@
       closePopovers();
       try {
         if (!currentPdfId) return;
-        
         document.getElementById('status-text').innerText = "EXPORTING FULL PDF... PLEASE WAIT";
-        await saveCurrentPageAnnotation();
+        saveCurrentPageAnnotation();
+
         const record = await idbGet('pdfData', currentPdfId);
         if (!record || !record.data) throw new Error("Could not load original PDF data.");
         
@@ -1130,32 +1457,42 @@
           if (annotationData === undefined) {
              const rec = await idbGet('annotations', currentPdfId + '_' + pageNum);
              if (rec && rec.data) annotationData = rec.data;
-             else if (rec && rec.dataUrl) annotationData = rec.dataUrl;
           }
+
           if (annotationData) {
-            let pngImageBytes;
-            if (annotationData instanceof Blob) {
-              pngImageBytes = await annotationData.arrayBuffer();
-            } else if (typeof annotationData === 'string' && annotationData.startsWith('data:image/png;base64,')) {
-               const b64 = annotationData.split(',')[1];
-               const binStr = atob(b64);
-               const arr = new Uint8Array(binStr.length);
-               for (let k = 0; k < binStr.length; k++) arr[k] = binStr.charCodeAt(k);
-               pngImageBytes = arr.buffer;
+            const page = pages[i];
+            const { width, height } = page.getSize();
+
+            let hlBlob = null;
+            if (annotationData.hl instanceof HTMLCanvasElement) {
+              hlBlob = await new Promise(r => annotationData.hl.toBlob(r, 'image/png'));
+            } else if (annotationData.hl instanceof Blob) {
+              hlBlob = annotationData.hl;
             }
-            
-            if (pngImageBytes) {
-               const pngImage = await pdf.embedPng(pngImageBytes);
-               const page = pages[i];
-               const { width, height } = page.getSize();
-               
-               page.drawImage(pngImage, {
-                 x: 0,
-                 y: 0,
-                 width: width,
-                 height: height,
-                 blendMode: BlendMode.Multiply
-               });
+
+            if (hlBlob) {
+              const hlBytes = await hlBlob.arrayBuffer();
+              const hlImage = await pdf.embedPng(hlBytes);
+              page.drawImage(hlImage, {
+                x: 0, y: 0, width, height,
+                blendMode: BlendMode.Multiply
+              });
+            }
+
+            let drawBlob = null;
+            const drawCandidate = annotationData.draw || (annotationData instanceof Blob ? annotationData : null);
+            if (drawCandidate instanceof HTMLCanvasElement) {
+              drawBlob = await new Promise(r => drawCandidate.toBlob(r, 'image/png'));
+            } else if (drawCandidate instanceof Blob) {
+              drawBlob = drawCandidate;
+            }
+
+            if (drawBlob) {
+              const drawBytes = await drawBlob.arrayBuffer();
+              const drawImage = await pdf.embedPng(drawBytes);
+              page.drawImage(drawImage, {
+                x: 0, y: 0, width, height
+              });
             }
           }
         }
