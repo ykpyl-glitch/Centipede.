@@ -25,6 +25,7 @@
       --disabled-grey: #444449;
     }
 
+    /* Strict iOS text selection reset */
     * { 
       box-sizing: border-box; 
       margin: 0; 
@@ -34,13 +35,14 @@
       -webkit-touch-callout: none; 
     }
 
+    /* REMOVED global touch-action: none to allow text loupe */
     html, body {
       background-color: #050505;
       color: var(--text-bright);
       font-family: 'Share Tech Mono', monospace;
       height: 100%;
       overflow: hidden;
-      overscroll-behavior: none;
+      overscroll-behavior: none; 
     }
 
     body { display: flex; flex-direction: column; }
@@ -77,6 +79,7 @@
       position: relative;
     }
 
+    /* -- VIEW TRANSITIONS -- */
     @keyframes viewFadeIn {
       from { opacity: 0; transform: scale(0.98) translateY(10px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
@@ -95,7 +98,7 @@
       animation: viewFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
     }
 
-    /* ---------- CAROUSEL MENU ---------- */
+    /* ---------- MAIN MENU VIEW ---------- */
     #view-menu { padding: 0; }
 
     .menu-carousel {
@@ -193,6 +196,7 @@
     }
     .cal-day.has-pdf:active { transform: scale(0.95); }
 
+    /* ---------- BUTTONS ---------- */
     .btn {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -306,6 +310,7 @@
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
     }
 
+    /* Z-INDEX STACKING */
     canvas, .textLayer { 
       position: absolute; 
       top: 0; 
@@ -329,14 +334,19 @@
       -webkit-tap-highlight-color: transparent;
     }
 
+    /* -------------------------------------------------------------
+       CRITICAL MODE TOGGLES FOR TEXT SELECTION (V2 FIX)
+    -------------------------------------------------------------- */
     #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
     #canvas-container.mode-select #draw-canvas { pointer-events: none; }
-    #canvas-container.mode-select .textLayer { pointer-events: auto; user-select: none; -webkit-user-select: none; }
-    #canvas-container.mode-select .textLayer span { 
-      user-select: text; 
-      -webkit-user-select: text; 
-      -webkit-touch-callout: default; 
-      cursor: text; 
+    
+    #canvas-container.mode-select .textLayer,
+    #canvas-container.mode-select .textLayer * { 
+      pointer-events: auto !important; 
+      user-select: text !important; 
+      -webkit-user-select: text !important; 
+      -webkit-touch-callout: default !important; 
+      cursor: text !important; 
     }
 
     .page-arrow {
@@ -534,7 +544,7 @@
       });
     }
 
-    // Suppress WebKit default gestures globally
+    // Suppress WebKit default gestures globally for standard interactions
     ['gesturestart', 'gesturechange', 'gestureend'].forEach(name => {
       document.addEventListener(name, (e) => e.preventDefault(), { passive: false });
     });
@@ -711,7 +721,6 @@
       const firstDay = new Date(year, month, 1).getDay();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-      // Empty padding days
       for(let i=0; i<firstDay; i++) {
         const empty = document.createElement('div');
         grid.appendChild(empty);
@@ -722,7 +731,6 @@
         dayEl.className = 'cal-day';
         dayEl.innerText = d;
 
-        // Check if any PDF timestamp falls on this exact day
         const matchedPdfs = [];
         folders.forEach(f => f.pdfs.forEach(p => {
           if (p.timestamp) {
@@ -1196,10 +1204,19 @@
 
     function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
+      
+      // We only prevent default IF the user is explicitly allowed to draw
+      e.preventDefault();
       closePopovers();
 
       if (e.pointerType === 'pen') {
         isPinching = false;
+      }
+
+      // Force-clear any stuck locks
+      if (activePointerId !== null && activePointerId !== e.pointerId) {
+        isDrawing = false;
+        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
       }
 
       activePenId = e.pointerId;
@@ -1451,7 +1468,7 @@
     }
 
     function saveCurrentPageAnnotation() {
-      if (!pdfDoc || !currentPdfId || !isPageDirty) return;
+      if (!pdfDoc || !currentPdfId || !isPageDirty) return Promise.resolve();
       const pageToSave = currentPageNum;
       isPageDirty = false;
 
