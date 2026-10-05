@@ -25,7 +25,6 @@
       --disabled-grey: #444449;
     }
 
-    /* Strict iOS text selection reset */
     * { 
       box-sizing: border-box; 
       margin: 0; 
@@ -35,7 +34,6 @@
       -webkit-touch-callout: none; 
     }
 
-    /* REMOVED global touch-action: none to allow text loupe */
     html, body {
       background-color: #050505;
       color: var(--text-bright);
@@ -79,7 +77,6 @@
       position: relative;
     }
 
-    /* -- VIEW TRANSITIONS -- */
     @keyframes viewFadeIn {
       from { opacity: 0; transform: scale(0.98) translateY(10px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
@@ -98,7 +95,6 @@
       animation: viewFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
     }
 
-    /* ---------- MAIN MENU VIEW ---------- */
     #view-menu { padding: 0; }
 
     .menu-carousel {
@@ -163,7 +159,6 @@
     .pdf-item:hover { background: var(--text-bright); color: #000; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1); }
     .empty-hint { color: var(--text-dim); font-size: 11px; padding: 8px 0; opacity: 0.7; }
 
-    /* ---------- CALENDAR UI ---------- */
     .calendar-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
@@ -196,7 +191,6 @@
     }
     .cal-day.has-pdf:active { transform: scale(0.95); }
 
-    /* ---------- BUTTONS ---------- */
     .btn {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -310,7 +304,6 @@
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
     }
 
-    /* Z-INDEX STACKING */
     canvas, .textLayer { 
       position: absolute; 
       top: 0; 
@@ -334,9 +327,6 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* -------------------------------------------------------------
-       CRITICAL MODE TOGGLES FOR TEXT SELECTION (V2 FIX)
-    -------------------------------------------------------------- */
     #canvas-container.mode-draw #draw-canvas { pointer-events: auto; }
     #canvas-container.mode-select #draw-canvas { pointer-events: none; }
     
@@ -421,7 +411,6 @@
     <section id="view-menu" class="view active">
       <div class="menu-carousel">
         
-        <!-- PANE 1: FOLDERS -->
         <div class="menu-pane">
           <div class="menu-title">
             // MAIN MENU 
@@ -435,7 +424,6 @@
           <div id="folder-tree" class="folder-tree"></div>
         </div>
 
-        <!-- PANE 2: CALENDAR -->
         <div class="menu-pane">
           <div class="menu-title">
             <span style="opacity:0.5; font-size:9px; margin-top:2px;">← SWIPE LEFT</span> 
@@ -544,11 +532,6 @@
       });
     }
 
-    // Suppress WebKit default gestures globally for standard interactions
-    ['gesturestart', 'gesturechange', 'gestureend'].forEach(name => {
-      document.addEventListener(name, (e) => e.preventDefault(), { passive: false });
-    });
-
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     let currentTool = 'pen'; 
@@ -571,7 +554,6 @@
     const strokeSnapshotCanvasDraw = document.createElement('canvas');
     const strokeSnapshotCanvasHl = document.createElement('canvas');
 
-    // Viewport & Scale Management
     let baseWidth = 0;
     let baseHeight = 0;
     let fitScale = 1.0;
@@ -586,7 +568,6 @@
     let zoomDebounceTimer = null;
     let currentRenderTask = null;
 
-    // Background Page Pre-fetch Cache
     const pdfPageCache = new Map();
 
     let undoStack = [];
@@ -602,7 +583,7 @@
     let currentPdfId = null;
     let pageAnnotations = {};
 
-    let currentCalDate = new Date(); // Calendar State
+    let currentCalDate = new Date(); 
 
     const pdfCanvas = document.getElementById('pdf-canvas');
     const pdfCtx = pdfCanvas.getContext('2d', { alpha: false });
@@ -708,7 +689,6 @@
       document.getElementById('status-text').innerText = "SYSTEM READY // LIBRARY LOADED";
     }
 
-    // --- CALENDAR LOGIC ---
     function renderCalendar() {
       const grid = document.getElementById('calendar-grid');
       if (!grid) return;
@@ -880,7 +860,6 @@
       }
     }
 
-    // --- PINCH-TO-ZOOM MATRIX (RESTRICTED TO SELECT MODE) ---
     function applyTransform() {
       const container = document.getElementById('canvas-container');
       container.style.transform = `translate3d(${currentPanX}px, ${currentPanY}px, 0) scale(${currentScale})`;
@@ -897,7 +876,6 @@
     const workspaceEl = document.querySelector('.workspace');
 
     workspaceEl.addEventListener('touchstart', (e) => {
-      // Strictly restrict zoom matrix to Select Mode
       if (interactionMode !== 'select') return; 
 
       const touches = Array.from(e.touches);
@@ -975,7 +953,6 @@
     workspaceEl.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
     workspaceEl.addEventListener('touchcancel', handleTouchEnd, { passive: false, capture: true });
 
-    // DYNAMIC VECTOR RE-RASTERIZATION ENGINE (Background rendering prevents flashes)
     async function reRenderPdfSharp() {
       if (!pdfDoc || !baseWidth || !baseHeight) return;
       const dpr = window.devicePixelRatio || 1;
@@ -993,7 +970,6 @@
         try { currentRenderTask.cancel(); } catch (err) {}
       }
 
-      // Draw onto an offscreen canvas to prevent the screen from going blank while loading
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = targetW;
       tempCanvas.height = targetH;
@@ -1013,7 +989,6 @@
         pdfCanvas.style.height = baseHeight + 'px';
         pdfCtx.drawImage(tempCanvas, 0, 0);
 
-        // Update instant-flip cache
         if (currentScale === 1 && !pdfPageCache.has(currentPageNum)) {
            const cacheCanvas = document.createElement('canvas');
            cacheCanvas.width = targetW;
@@ -1024,7 +999,6 @@
       } catch (err) {}
     }
 
-    // Background Page Pre-fetcher
     async function preRenderPage(num) {
       if (!pdfDoc || num > totalPages || num < 1 || pdfPageCache.has(num)) return;
       try {
@@ -1205,17 +1179,12 @@
     function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
       
-      // Strictly block Safari's double-tap and scroll timers
-      e.preventDefault();
-      e.stopPropagation();
-      
       closePopovers();
 
       if (e.pointerType === 'pen') {
         isPinching = false;
       }
 
-      // Force-clear any stuck locks
       if (activePenId !== null && activePenId !== e.pointerId) {
         isDrawing = false;
         try { drawCanvas.releasePointerCapture(activePenId); } catch (err) {}
@@ -1238,9 +1207,7 @@
       const startPt = getPos(e);
       strokePoints = [startPt]; 
       
-      // Hardware-lock the digitizer to this specific canvas
       try { drawCanvas.setPointerCapture(activePenId); } catch (err) {}
-      
       drawPoint(startPt);
     }
 
@@ -1325,19 +1292,28 @@
     function stopDrawing(e) {
       if (e.pointerId !== activePenId) return;
       
-      // Prevent Safari from synthesizing phantom clicks on lift
-      e.preventDefault();
-      
       isDrawing = false;
       activePenId = null;
       strokePoints = [];
     }
 
-    drawCanvas.addEventListener('pointerdown', startDrawing);
-    drawCanvas.addEventListener('pointermove', draw);
-    drawCanvas.addEventListener('pointerup', stopDrawing);
-    drawCanvas.addEventListener('pointercancel', stopDrawing);
-    drawCanvas.addEventListener('pointerleave', stopDrawing);
+    // 1. Core Pointer Events (No PreventDefault to keep Safari tracking smooth)
+    drawCanvas.addEventListener('pointerdown', startDrawing, { passive: false });
+    drawCanvas.addEventListener('pointermove', draw, { passive: false });
+    drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
+    drawCanvas.addEventListener('pointercancel', stopDrawing, { passive: false });
+    drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
+
+    // 2. The iPad "Rapid Dot" Fix
+    // Intercepts raw touch events to stop Safari from swallowing rapid strokes as double-taps
+    const preventDoubleTap = (e) => {
+      if (interactionMode === 'draw') {
+        e.preventDefault();
+      }
+    };
+    drawCanvas.addEventListener('touchstart', preventDoubleTap, { passive: false });
+    drawCanvas.addEventListener('touchmove', preventDoubleTap, { passive: false });
+    drawCanvas.addEventListener('touchend', preventDoubleTap, { passive: false });
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && currentPdfId) {
@@ -1504,7 +1480,6 @@
       }, 30);
     }
 
-    // INSTANT DOUBLE-BUFFERED PAGE RENDERER
     async function renderPage(num) {
       if (!pdfDoc || num < 1 || num > totalPages) return;
       
@@ -1539,12 +1514,10 @@
       highlightCtx.clearRect(0, 0, highlightCanvas.width / dpr, highlightCanvas.height / dpr);
       textLayerDiv.innerHTML = '';
 
-      // 1. Draw cached PDF instantly to screen
       if (pdfPageCache.has(num)) {
           pdfCtx.drawImage(pdfPageCache.get(num), 0, 0, pdfCanvas.width, pdfCanvas.height);
       }
 
-      // 2. Draw Ink instantly to screen
       let saved = pageAnnotations[num];
       if (saved === undefined) {
         const rec = await idbGet('annotations', currentPdfId + '_' + num);
@@ -1576,7 +1549,6 @@
         }
       }
 
-      // 3. Render High-Res PDF in background (Non-blocking)
       reRenderPdfSharp().then(async () => {
         const textContent = await page.getTextContent();
         await pdfjsLib.renderTextLayer({
