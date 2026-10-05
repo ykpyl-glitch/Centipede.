@@ -1202,7 +1202,7 @@
       return false;
     }
 
-    function startDrawing(e) {
+            function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
       
       // We only prevent default IF the user is explicitly allowed to draw
@@ -1213,10 +1213,10 @@
         isPinching = false;
       }
 
-      // Force-clear any stuck locks
-      if (activePointerId !== null && activePointerId !== e.pointerId) {
+      // FIX: Use activePenId instead of the undefined activePointerId
+      if (activePenId !== null && activePenId !== e.pointerId) {
         isDrawing = false;
-        try { drawCanvas.releasePointerCapture(activePointerId); } catch (err) {}
+        try { drawCanvas.releasePointerCapture(activePenId); } catch (err) {}
       }
 
       activePenId = e.pointerId;
@@ -1239,6 +1239,8 @@
       try { drawCanvas.setPointerCapture(activePenId); } catch (err) {}
       drawPoint(startPt);
     }
+
+
 
     function draw(e) {
       if (!isDrawing || e.pointerId !== activePenId) return;
