@@ -1202,18 +1202,20 @@
       return false;
     }
 
-            function startDrawing(e) {
+    function startDrawing(e) {
       if (!shouldAcceptPointer(e)) return;
       
-      // We only prevent default IF the user is explicitly allowed to draw
+      // Strictly block Safari's double-tap and scroll timers
       e.preventDefault();
+      e.stopPropagation();
+      
       closePopovers();
 
       if (e.pointerType === 'pen') {
         isPinching = false;
       }
 
-      // FIX: Use activePenId instead of the undefined activePointerId
+      // Force-clear any stuck locks
       if (activePenId !== null && activePenId !== e.pointerId) {
         isDrawing = false;
         try { drawCanvas.releasePointerCapture(activePenId); } catch (err) {}
@@ -1236,11 +1238,11 @@
       const startPt = getPos(e);
       strokePoints = [startPt]; 
       
+      // Hardware-lock the digitizer to this specific canvas
       try { drawCanvas.setPointerCapture(activePenId); } catch (err) {}
+      
       drawPoint(startPt);
     }
-
-
 
     function draw(e) {
       if (!isDrawing || e.pointerId !== activePenId) return;
@@ -1322,6 +1324,10 @@
 
     function stopDrawing(e) {
       if (e.pointerId !== activePenId) return;
+      
+      // Prevent Safari from synthesizing phantom clicks on lift
+      e.preventDefault();
+      
       isDrawing = false;
       activePenId = null;
       strokePoints = [];
